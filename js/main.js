@@ -59,11 +59,15 @@ class App {
     }
 
     setupEventListeners() {
-        this.elements.dropZone.addEventListener('click', () => {
-            this.elements.fileInput.click();
+        this.elements.dropZone.addEventListener('click', (e) => {
+            // Only prevent if it's not the file input itself
+            if (e.target !== this.elements.fileInput) {
+                this.elements.fileInput.click();
+            }
         });
 
-        this.elements.openButton.addEventListener('click', () => {
+        this.elements.openButton.addEventListener('click', (e) => {
+            e.stopPropagation();
             this.elements.fileInput.click();
         });
 
@@ -71,6 +75,8 @@ class App {
             const file = e.target.files[0];
             if (file) {
                 this.handleFileSelect(file);
+                // Clear the input value to allow selecting the same file again
+                e.target.value = '';
             }
         });
 
