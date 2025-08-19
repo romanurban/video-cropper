@@ -110,16 +110,30 @@ export class TimelineFrames {
         this.updateLayout();
         
         const containerWidth = this.container.getBoundingClientRect().width;
-        const thumbnailWidth = 120;
-        const maxThumbnails = 200;
-        const targetInterval = 4; // seconds per thumbnail
+        const thumbnailWidth = 100; // Reduced width to fit more thumbnails
+        const thumbnailSpacing = 1; // Reduced spacing
+        const maxThumbnails = 300; // Increased maximum
         
-        let count = Math.floor(this.duration / targetInterval);
-        count = Math.min(count, maxThumbnails);
-        count = Math.max(count, Math.floor(containerWidth / thumbnailWidth) || 10);
+        // Calculate how many thumbnails can fit in the container width
+        const availableWidth = containerWidth - 32; // Account for padding
+        const thumbnailsPerWidth = Math.floor(availableWidth / (thumbnailWidth + thumbnailSpacing));
+        
+        // Calculate count based on duration or fit to width
+        const targetInterval = 2; // seconds per thumbnail (increased granularity)
+        let countByDuration = Math.floor(this.duration / targetInterval);
+        
+        // Prioritize fitting more thumbnails, use container width as primary constraint
+        let count = Math.min(thumbnailsPerWidth, maxThumbnails);
+        
+        // If we have fewer thumbnails than duration would suggest, use duration-based count
+        if (countByDuration < count && countByDuration > 10) {
+            count = countByDuration;
+        }
+        
+        count = Math.max(count, 10); // Minimum 10 thumbnails for better granularity
         
         this.clearThumbnails();
-        this.createPlaceholders(count);
+        this.createPlaceholders(count, availableWidth);
         
         this.thumbnailService.generateThumbnails(
             this.duration,
@@ -128,11 +142,27 @@ export class TimelineFrames {
         );
     }
 
-    createPlaceholders(count) {
-        const thumbnailWidth = 120;
+    createPlaceholders(count, availableWidth) {
         const videoMetadata = appState.getState('videoMetadata');
         const aspectRatio = videoMetadata ? videoMetadata.width / videoMetadata.height : 16/9;
-        const thumbnailHeight = Math.round(thumbnailWidth / aspectRatio);
+        
+        // Calculate thumbnail width to fill available space
+        const thumbnailSpacing = 2;
+        const totalSpacing = (count - 1) * thumbnailSpacing;
+        const thumbnailWidth = Math.floor((availableWidth - totalSpacing) / count);
+        const maxThumbnailHeight = 86; // Leave space for time labels - 10px margin from 96px container
+        let thumbnailHeight = Math.round(thumbnailWidth / aspectRatio);
+        
+        // For vertical videos, limit height and adjust width accordingly
+        if (thumbnailHeight > maxThumbnailHeight) {
+            thumbnailHeight = maxThumbnailHeight;
+            // Recalculate width based on max height to maintain aspect ratio
+            const adjustedWidth = Math.round(thumbnailHeight * aspectRatio);
+            // If adjusted width is too small, keep original but crop height
+            if (adjustedWidth < thumbnailWidth * 0.6) {
+                thumbnailHeight = maxThumbnailHeight;
+            }
+        }
         
         for (let i = 0; i < count; i++) {
             const placeholder = document.createElement('div');
@@ -152,8 +182,9 @@ export class TimelineFrames {
             this.thumbnailsContainer.appendChild(placeholder);
         }
         
-        this.stripWidth = count * thumbnailWidth;
-        this.thumbnailsContainer.style.width = `${this.stripWidth}px`;
+        // Make sure container takes full width
+        this.thumbnailsContainer.style.width = '100%';
+        this.thumbnailsContainer.style.justifyContent = 'space-between';
     }
 
     onThumbnailGenerated(index, thumbnailUrl, time) {

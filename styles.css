@@ -118,14 +118,16 @@ body {
     background: #1e1e1e;
     border-top: 1px solid #3a3a3a;
     border-bottom: 1px solid #3a3a3a;
-    padding: 0.5rem;
+    padding: 0.75rem;
     overflow-x: auto;
     overflow-y: hidden;
+    margin-bottom: 0;
 }
 
 .timeline-frames {
-    min-height: 96px;
+    height: 96px;
     width: 100%;
+    overflow: hidden;
 }
 
 .frame-strip {
@@ -134,12 +136,16 @@ body {
     cursor: pointer;
     user-select: none;
     touch-action: pan-x;
+    margin-bottom: 4px;
 }
 
 .thumbnails-container {
     display: flex;
     height: 100%;
     position: relative;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .thumbnail-placeholder,
@@ -150,7 +156,6 @@ body {
     border: 1px solid #3a3a3a;
     border-radius: 4px;
     overflow: hidden;
-    margin-right: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -166,19 +171,24 @@ body {
     height: 100%;
     object-fit: cover;
     display: block;
+    object-position: center;
 }
 
 .thumbnail-time {
     position: absolute;
     bottom: 2px;
     left: 2px;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.9);
     color: white;
     font-size: 10px;
-    padding: 1px 3px;
+    padding: 2px 4px;
     border-radius: 2px;
     font-family: 'Courier New', monospace;
     pointer-events: none;
+    z-index: 10;
+    max-width: calc(100% - 8px);
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 .progress-overlay {
@@ -221,100 +231,13 @@ body {
     border-top: 1px solid #3a3a3a;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 1rem;
+    margin-top: 0;
 }
 
-.timeline-container {
-    flex: 1;
-    max-width: 300px;
-    height: 40px;
-    position: relative;
-    margin-right: 1rem;
-    pointer-events: none;
-}
 
-.timeline {
-    position: relative;
-    height: 100%;
-    width: 100%;
-}
-
-.timeline-track {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 8px;
-    background: #3a3a3a;
-    border-radius: 4px;
-    transform: translateY(-50%);
-}
-
-.timeline-progress {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    background: #4a9eff;
-    border-radius: 4px 0 0 4px;
-    transition: width 0.1s ease;
-    pointer-events: none;
-}
-
-.timeline-playhead {
-    position: absolute;
-    top: 50%;
-    width: 14px;
-    height: 14px;
-    background: #ffffff;
-    border: 2px solid #4a9eff;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    transition: left 0.1s ease;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.timeline-ticks {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-}
-
-.tick {
-    position: absolute;
-    background: #666;
-    pointer-events: none;
-}
-
-.tick.minor {
-    width: 1px;
-    height: 6px;
-    top: 17px;
-}
-
-.tick.major {
-    width: 1px;
-    height: 10px;
-    top: 15px;
-    background: #888;
-}
-
-.tick-label {
-    position: absolute;
-    font-size: 0.75rem;
-    color: #cccccc;
-    transform: translateX(-50%);
-    top: 26px;
-    white-space: nowrap;
-    pointer-events: none;
-}
-
-#play-pause-button,
-#snapshot-button {
+#play-pause-button {
     background: #4a9eff;
     color: white;
     border: none;
@@ -322,67 +245,14 @@ body {
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
-    min-width: 60px;
+    min-width: 80px;
     transition: background 0.2s;
 }
 
-#play-pause-button:hover,
-#snapshot-button:hover {
+#play-pause-button:hover {
     background: #3a8eef;
 }
 
-.overlay-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-    color: #cccccc;
-    cursor: pointer;
-    user-select: none;
-}
-
-.overlay-toggle input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    accent-color: #4a9eff;
-    cursor: pointer;
-}
-
-.progress-slider {
-    flex: 1;
-    height: 6px;
-    background: #3a3a3a;
-    border-radius: 3px;
-    outline: none;
-    cursor: pointer;
-    -webkit-appearance: none;
-}
-
-.progress-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    background: #4a9eff;
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.progress-slider::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    background: #4a9eff;
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-}
-
-#current-time,
-#total-time {
-    font-size: 0.9rem;
-    color: #cccccc;
-    min-width: 40px;
-    text-align: center;
-}
 
 @media (max-width: 768px) {
     .app-header {
@@ -409,12 +279,6 @@ body {
     }
     
     .controls-panel {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-    
-    .progress-slider {
-        order: -1;
-        width: 100%;
+        justify-content: center;
     }
 }
