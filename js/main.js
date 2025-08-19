@@ -1,12 +1,14 @@
 import { appState } from './state.js';
 import { VideoPlayer } from './video-player.js';
 import { FrameRenderer } from './frame-renderer.js';
+import { TimelineView } from './timeline-view.js';
 import { isVideoFile, formatTime } from './utils.js';
 
 class App {
     constructor() {
         this.videoPlayer = null;
         this.frameRenderer = null;
+        this.timelineView = null;
         this.elements = {};
         
         this.init();
@@ -16,6 +18,7 @@ class App {
         this.getElements();
         this.setupVideoPlayer();
         this.setupFrameRenderer();
+        this.setupTimelineView();
         this.setupEventListeners();
         this.setupStateSubscriptions();
     }
@@ -30,6 +33,7 @@ class App {
             canvasElement: document.getElementById('canvas-element'),
             controlsPanel: document.getElementById('controls-panel'),
             metadataPanel: document.getElementById('metadata-panel'),
+            timelineContainer: document.getElementById('timeline-container'),
             playPauseButton: document.getElementById('play-pause-button'),
             progressSlider: document.getElementById('progress-slider'),
             currentTimeDisplay: document.getElementById('current-time'),
@@ -49,6 +53,10 @@ class App {
             this.elements.videoElement,
             this.elements.canvasElement
         );
+    }
+
+    setupTimelineView() {
+        this.timelineView = new TimelineView(this.elements.timelineContainer);
     }
 
     setupEventListeners() {

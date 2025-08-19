@@ -123,6 +123,95 @@ body {
     gap: 1rem;
 }
 
+.timeline-container {
+    flex: 1;
+    max-width: 300px;
+    height: 40px;
+    position: relative;
+    margin-right: 1rem;
+    pointer-events: none;
+}
+
+.timeline {
+    position: relative;
+    height: 100%;
+    width: 100%;
+}
+
+.timeline-track {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: #3a3a3a;
+    border-radius: 4px;
+    transform: translateY(-50%);
+}
+
+.timeline-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: #4a9eff;
+    border-radius: 4px 0 0 4px;
+    transition: width 0.1s ease;
+    pointer-events: none;
+}
+
+.timeline-playhead {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border: 2px solid #4a9eff;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: left 0.1s ease;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.timeline-ticks {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.tick {
+    position: absolute;
+    background: #666;
+    pointer-events: none;
+}
+
+.tick.minor {
+    width: 1px;
+    height: 6px;
+    top: 17px;
+}
+
+.tick.major {
+    width: 1px;
+    height: 10px;
+    top: 15px;
+    background: #888;
+}
+
+.tick-label {
+    position: absolute;
+    font-size: 0.75rem;
+    color: #cccccc;
+    transform: translateX(-50%);
+    top: 26px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
 #play-pause-button {
     background: #4a9eff;
     color: white;
