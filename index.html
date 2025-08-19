@@ -38,6 +38,10 @@
                 ></canvas>
             </div>
 
+            <div class="timeline-section" id="timeline-section" style="display: none;">
+                <div id="timeline-frames" class="timeline-frames"></div>
+            </div>
+
             <div class="controls-panel" id="controls-panel" style="display: none;">
                 <div id="timeline-container" class="timeline-container" role="presentation"></div>
                 <button id="play-pause-button">Play</button>
@@ -53,6 +57,7 @@
                     max="100" 
                     value="0"
                     class="progress-slider"
+                    aria-label="Video progress slider"
                 >
                 <span id="current-time">00:00</span>
                 <span>/</span>

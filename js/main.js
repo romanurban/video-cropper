@@ -2,6 +2,7 @@ import { appState } from './state.js';
 import { VideoPlayer } from './video-player.js';
 import { FrameRenderer } from './frame-renderer.js';
 import { TimelineView } from './timeline-view.js';
+import { TimelineFrames } from './timeline-frames.js';
 import { isVideoFile, formatTime, formatTimecode, getVideoBaseName, downloadBlob } from './utils.js';
 
 class App {
@@ -9,6 +10,7 @@ class App {
         this.videoPlayer = null;
         this.frameRenderer = null;
         this.timelineView = null;
+        this.timelineFrames = null;
         this.elements = {};
         
         this.init();
@@ -19,6 +21,7 @@ class App {
         this.setupVideoPlayer();
         this.setupFrameRenderer();
         this.setupTimelineView();
+        this.setupTimelineFrames();
         this.setupEventListeners();
         this.setupStateSubscriptions();
     }
@@ -33,7 +36,9 @@ class App {
             canvasElement: document.getElementById('canvas-element'),
             controlsPanel: document.getElementById('controls-panel'),
             metadataPanel: document.getElementById('metadata-panel'),
+            timelineSection: document.getElementById('timeline-section'),
             timelineContainer: document.getElementById('timeline-container'),
+            timelineFrames: document.getElementById('timeline-frames'),
             playPauseButton: document.getElementById('play-pause-button'),
             snapshotButton: document.getElementById('snapshot-button'),
             overlayCheckbox: document.getElementById('overlay-checkbox'),
@@ -59,6 +64,10 @@ class App {
 
     setupTimelineView() {
         this.timelineView = new TimelineView(this.elements.timelineContainer);
+    }
+
+    setupTimelineFrames() {
+        this.timelineFrames = new TimelineFrames(this.elements.timelineFrames, this.videoPlayer);
     }
 
     setupEventListeners() {
@@ -215,6 +224,7 @@ class App {
     showDropZone() {
         this.elements.dropZone.style.display = 'flex';
         this.elements.videoContainer.style.display = 'none';
+        this.elements.timelineSection.style.display = 'none';
         this.elements.controlsPanel.style.display = 'none';
         this.elements.metadataPanel.style.display = 'none';
     }
@@ -222,6 +232,7 @@ class App {
     showVideoInterface() {
         this.elements.dropZone.style.display = 'none';
         this.elements.videoContainer.style.display = 'flex';
+        this.elements.timelineSection.style.display = 'block';
         this.elements.controlsPanel.style.display = 'flex';
         this.elements.metadataPanel.style.display = 'flex';
     }

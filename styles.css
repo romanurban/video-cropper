@@ -114,6 +114,107 @@ body {
     border-radius: 4px;
 }
 
+.timeline-section {
+    background: #1e1e1e;
+    border-top: 1px solid #3a3a3a;
+    border-bottom: 1px solid #3a3a3a;
+    padding: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.timeline-frames {
+    min-height: 96px;
+    width: 100%;
+}
+
+.frame-strip {
+    position: relative;
+    height: 96px;
+    cursor: pointer;
+    user-select: none;
+    touch-action: pan-x;
+}
+
+.thumbnails-container {
+    display: flex;
+    height: 100%;
+    position: relative;
+}
+
+.thumbnail-placeholder,
+.thumbnail {
+    position: relative;
+    flex-shrink: 0;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-right: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.thumbnail-placeholder:hover,
+.thumbnail:hover {
+    border-color: #4a9eff;
+}
+
+.thumbnail-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.thumbnail-time {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 10px;
+    padding: 1px 3px;
+    border-radius: 2px;
+    font-family: 'Courier New', monospace;
+    pointer-events: none;
+}
+
+.progress-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(74, 158, 255, 0.3);
+    pointer-events: none;
+    transition: width 0.1s ease;
+}
+
+.timeline-playhead-frames {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #ffffff;
+    box-shadow: 0 0 4px rgba(74, 158, 255, 0.8);
+    pointer-events: none;
+    z-index: 10;
+    transition: left 0.1s ease;
+}
+
+.timeline-playhead-frames::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: -4px;
+    width: 11px;
+    height: 12px;
+    background: #ffffff;
+    border: 2px solid #4a9eff;
+    clip-path: polygon(50% 100%, 0 0, 100% 0);
+}
+
 .controls-panel {
     background: #2a2a2a;
     padding: 1rem;
@@ -293,6 +394,18 @@ body {
         flex-direction: column;
         gap: 0.5rem;
         text-align: center;
+    }
+    
+    .timeline-section {
+        padding: 0.25rem;
+    }
+    
+    .frame-strip {
+        height: 72px;
+    }
+    
+    .timeline-frames {
+        min-height: 72px;
     }
     
     .controls-panel {
