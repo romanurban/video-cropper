@@ -9,7 +9,8 @@ class AppState {
             currentTime: 0,
             duration: 0,
             isLoading: false,
-            error: null
+            error: null,
+            overlayEnabled: true
         };
     }
 
@@ -87,6 +88,10 @@ class AppState {
         this.setState({ error });
     }
 
+    setOverlayEnabled(enabled) {
+        this.setState({ overlayEnabled: enabled });
+    }
+
     reset() {
         this.setState({
             file: null,
@@ -96,7 +101,8 @@ class AppState {
             currentTime: 0,
             duration: 0,
             isLoading: false,
-            error: null
+            error: null,
+            overlayEnabled: true
         });
     }
 }

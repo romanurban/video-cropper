@@ -41,6 +41,11 @@
             <div class="controls-panel" id="controls-panel" style="display: none;">
                 <div id="timeline-container" class="timeline-container" role="presentation"></div>
                 <button id="play-pause-button">Play</button>
+                <button id="snapshot-button" aria-label="Take snapshot of current frame">Snapshot</button>
+                <label class="overlay-toggle">
+                    <input type="checkbox" id="overlay-checkbox" checked aria-label="Show timecode overlay">
+                    <span>Overlay</span>
+                </label>
                 <input 
                     type="range" 
                     id="progress-slider" 

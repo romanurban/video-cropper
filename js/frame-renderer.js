@@ -1,5 +1,5 @@
 import { appState } from './state.js';
-import { getCanvasSize, setupCanvasForDPR, debounce } from './utils.js';
+import { getCanvasSize, setupCanvasForDPR, debounce, formatTimecode, getDevicePixelRatio } from './utils.js';
 
 export class FrameRenderer {
     constructor(videoElement, canvasElement) {
@@ -10,6 +10,8 @@ export class FrameRenderer {
         this.isRendering = false;
         this.containerWidth = 0;
         this.containerHeight = 0;
+        this.renderWidth = 0;
+        this.renderHeight = 0;
         
         this.handleResize = debounce(this.updateCanvasSize.bind(this), 100);
         this.setupEventListeners();
@@ -80,6 +82,8 @@ export class FrameRenderer {
             this.containerHeight
         );
 
+        this.renderWidth = width;
+        this.renderHeight = height;
         this.ctx = setupCanvasForDPR(this.canvasElement, width, height);
         
         this.renderFrame();
@@ -119,30 +123,80 @@ export class FrameRenderer {
         if (!metadata || this.videoElement.readyState < 2) return;
 
         try {
+            const dpr = getDevicePixelRatio();
             const canvasWidth = this.canvasElement.width;
             const canvasHeight = this.canvasElement.height;
             
-            this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            this.ctx.clearRect(0, 0, canvasWidth / dpr, canvasHeight / dpr);
             
             this.ctx.drawImage(
                 this.videoElement,
                 0,
                 0,
-                this.canvasElement.style.width.replace('px', ''),
-                this.canvasElement.style.height.replace('px', '')
+                this.renderWidth,
+                this.renderHeight
             );
+            
+            this.drawOverlay();
             
         } catch (error) {
             console.warn('Error rendering frame:', error);
         }
     }
 
+    drawOverlay() {
+        const overlayEnabled = appState.getState('overlayEnabled');
+        if (!overlayEnabled) return;
+
+        const currentTime = appState.getState('currentTime');
+        const metadata = appState.getState('videoMetadata');
+        
+        if (!metadata) return;
+
+        const timecode = formatTimecode(currentTime);
+        const resolution = `${metadata.width}×${metadata.height}`;
+        
+        this.ctx.save();
+        
+        const fontSize = 14;
+        this.ctx.font = `${fontSize}px "Courier New", monospace`;
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'top';
+        
+        const padding = 12;
+        const lineHeight = fontSize + 4;
+        const x = padding;
+        const y = this.renderHeight - padding - (lineHeight * 2);
+        
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+        this.ctx.lineWidth = 3;
+        
+        this.ctx.strokeText(timecode, x, y);
+        this.ctx.strokeText(resolution, x, y + lineHeight);
+        
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillText(timecode, x, y);
+        this.ctx.fillText(resolution, x, y + lineHeight);
+        
+        this.ctx.restore();
+    }
+
     clearCanvas() {
         if (!this.ctx) return;
         
+        const dpr = getDevicePixelRatio();
         const canvasWidth = this.canvasElement.width;
         const canvasHeight = this.canvasElement.height;
-        this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        this.ctx.clearRect(0, 0, canvasWidth / dpr, canvasHeight / dpr);
+    }
+
+    captureFrame() {
+        return new Promise((resolve) => {
+            this.canvasElement.toBlob((blob) => {
+                resolve(blob);
+            }, 'image/png');
+        });
     }
 
     getCanvasDataURL(format = 'image/png', quality = 0.92) {

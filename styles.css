@@ -212,7 +212,8 @@ body {
     pointer-events: none;
 }
 
-#play-pause-button {
+#play-pause-button,
+#snapshot-button {
     background: #4a9eff;
     color: white;
     border: none;
@@ -224,8 +225,26 @@ body {
     transition: background 0.2s;
 }
 
-#play-pause-button:hover {
+#play-pause-button:hover,
+#snapshot-button:hover {
     background: #3a8eef;
+}
+
+.overlay-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #cccccc;
+    cursor: pointer;
+    user-select: none;
+}
+
+.overlay-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #4a9eff;
+    cursor: pointer;
 }
 
 .progress-slider {

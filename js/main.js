@@ -2,7 +2,7 @@ import { appState } from './state.js';
 import { VideoPlayer } from './video-player.js';
 import { FrameRenderer } from './frame-renderer.js';
 import { TimelineView } from './timeline-view.js';
-import { isVideoFile, formatTime } from './utils.js';
+import { isVideoFile, formatTime, formatTimecode, getVideoBaseName, downloadBlob } from './utils.js';
 
 class App {
     constructor() {
@@ -35,6 +35,8 @@ class App {
             metadataPanel: document.getElementById('metadata-panel'),
             timelineContainer: document.getElementById('timeline-container'),
             playPauseButton: document.getElementById('play-pause-button'),
+            snapshotButton: document.getElementById('snapshot-button'),
+            overlayCheckbox: document.getElementById('overlay-checkbox'),
             progressSlider: document.getElementById('progress-slider'),
             currentTimeDisplay: document.getElementById('current-time'),
             totalTimeDisplay: document.getElementById('total-time'),
@@ -118,6 +120,14 @@ class App {
         this.elements.progressSlider.addEventListener('mouseup', () => {
             this.isDragging = false;
         });
+
+        this.elements.snapshotButton.addEventListener('click', () => {
+            this.handleSnapshot();
+        });
+
+        this.elements.overlayCheckbox.addEventListener('change', (e) => {
+            appState.setOverlayEnabled(e.target.checked);
+        });
     }
 
     setupStateSubscriptions() {
@@ -159,6 +169,10 @@ class App {
             if (error) {
                 this.showError(error);
             }
+        });
+
+        appState.subscribe('overlayEnabled', (enabled) => {
+            this.elements.overlayCheckbox.checked = enabled;
         });
     }
 
@@ -210,6 +224,28 @@ class App {
         this.elements.videoContainer.style.display = 'flex';
         this.elements.controlsPanel.style.display = 'flex';
         this.elements.metadataPanel.style.display = 'flex';
+    }
+
+    async handleSnapshot() {
+        try {
+            const blob = await this.frameRenderer.captureFrame();
+            if (!blob) {
+                this.showError('Failed to capture frame');
+                return;
+            }
+
+            const filename = appState.getState('filename');
+            const currentTime = appState.getState('currentTime');
+            const baseName = getVideoBaseName(filename);
+            const timecode = formatTimecode(currentTime).replace(/:/g, '');
+            const snapshotFilename = `${baseName}-${timecode}-snapshot.png`;
+
+            downloadBlob(blob, snapshotFilename);
+
+        } catch (error) {
+            console.error('Error capturing snapshot:', error);
+            this.showError(`Failed to capture snapshot: ${error.message}`);
+        }
     }
 
     showError(message) {

@@ -83,6 +83,48 @@ export function getDevicePixelRatio() {
     return window.devicePixelRatio || 1;
 }
 
+export function formatTimecode(seconds, options = {}) {
+    const { withMillis = false } = options;
+    
+    if (isNaN(seconds) || !isFinite(seconds)) return '00:00:00';
+    
+    const totalSeconds = Math.floor(seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    
+    let timecode = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    
+    if (withMillis) {
+        const millis = Math.floor((seconds % 1) * 1000);
+        timecode += `.${millis.toString().padStart(3, '0')}`;
+    }
+    
+    return timecode;
+}
+
+export function getVideoBaseName(filename) {
+    if (!filename) return 'video';
+    const name = filename.split('.').slice(0, -1).join('.');
+    return name || 'video';
+}
+
+export function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    setTimeout(() => {
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+
 export function setupCanvasForDPR(canvas, width, height) {
     const dpr = getDevicePixelRatio();
     const ctx = canvas.getContext('2d');
