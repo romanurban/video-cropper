@@ -36,6 +36,8 @@ class App {
             timelineSection: document.getElementById('timeline-section'),
             timelineFrames: document.getElementById('timeline-frames'),
             playPauseButton: document.getElementById('play-pause-button'),
+            volumeSlider: document.getElementById('volume-slider'),
+            volumePercent: document.getElementById('volume-percentage'),
             filenameDisplay: document.getElementById('filename'),
             durationDisplay: document.getElementById('duration'),
             resolutionDisplay: document.getElementById('resolution')
@@ -110,7 +112,23 @@ class App {
                 this.videoPlayer.play();
             }
         });
+        if (this.elements.volumeSlider) {
+            const updateLabel = (percent) => {
+                if (this.elements.volumePercent) {
+                    this.elements.volumePercent.textContent = `${Math.round(percent)}%`;
+                }
+            };
+            const initialVol = appState.getState('volume');
+            const initialPercent = Math.round(((typeof initialVol === 'number') ? initialVol : 1) * 100);
+            this.elements.volumeSlider.value = String(initialPercent);
+            updateLabel(initialPercent);
 
+            this.elements.volumeSlider.addEventListener('input', (e) => {
+                const percent = Number(e.target.value);
+                updateLabel(percent);
+                this.videoPlayer.setVolume(percent / 100);
+            });
+        }
     }
 
     setupStateSubscriptions() {
@@ -135,6 +153,18 @@ class App {
 
         appState.subscribe('isPlaying', (isPlaying) => {
             this.elements.playPauseButton.textContent = isPlaying ? 'Pause' : 'Play';
+        });
+
+        appState.subscribe('volume', (volume) => {
+            if (this.elements.volumeSlider) {
+                const percent = Math.round(((typeof volume === 'number') ? volume : 1) * 100);
+                if (Number(this.elements.volumeSlider.value) !== percent) {
+                    this.elements.volumeSlider.value = String(percent);
+                }
+                if (this.elements.volumePercent) {
+                    this.elements.volumePercent.textContent = `${percent}%`;
+                }
+            }
         });
 
         appState.subscribe('error', (error) => {

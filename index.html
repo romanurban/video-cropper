@@ -44,6 +44,19 @@
 
             <div class="controls-panel" id="controls-panel" style="display: none;">
                 <button id="play-pause-button">Play</button>
+                <div class="volume-control">
+                    <label id="volume-label" for="volume-slider">Volume</label>
+                    <input
+                        id="volume-slider"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value="100"
+                        aria-label="Volume"
+                    />
+                    <span id="volume-percentage" aria-hidden="true">100%</span>
+                </div>
             </div>
         </main>
     </div>

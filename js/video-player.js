@@ -7,6 +7,20 @@ export class VideoPlayer {
         this.currentObjectURL = null;
         
         this.setupEventListeners();
+        // Initialize audio properties from state
+        try {
+            const initialVolume = appState.getState('volume');
+            const initialMuted = appState.getState('muted');
+            if (typeof initialVolume === 'number') {
+                this.videoElement.volume = Math.max(0, Math.min(1, initialVolume));
+            }
+            if (typeof initialMuted === 'boolean') {
+                this.videoElement.muted = initialMuted;
+            }
+        } catch (e) {
+            // Non-fatal; fall back to element defaults
+            console.warn('Volume init failed:', e);
+        }
     }
 
     setupEventListeners() {
@@ -21,6 +35,7 @@ export class VideoPlayer {
         this.videoElement.addEventListener('error', this.handleError.bind(this));
         this.videoElement.addEventListener('seeking', this.handleSeeking.bind(this));
         this.videoElement.addEventListener('seeked', this.handleSeeked.bind(this));
+        this.videoElement.addEventListener('volumechange', this.handleVolumeChange.bind(this));
     }
 
     async loadFile(file) {
@@ -109,6 +124,12 @@ export class VideoPlayer {
         appState.setLoading(false);
     }
 
+    handleVolumeChange() {
+        // Reflect element values back to state
+        appState.setVolume(this.videoElement.volume);
+        appState.setMuted(this.videoElement.muted);
+    }
+
     play() {
         if (this.videoElement.readyState >= 2) {
             return this.videoElement.play().catch(error => {
@@ -120,6 +141,15 @@ export class VideoPlayer {
 
     pause() {
         this.videoElement.pause();
+    }
+
+    setVolume(volume) {
+        const v = Math.max(0, Math.min(1, Number(volume)));
+        this.videoElement.volume = v;
+    }
+
+    setMuted(muted) {
+        this.videoElement.muted = Boolean(muted);
     }
 
     seekTo(time) {

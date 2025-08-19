@@ -253,6 +253,53 @@ body {
     background: #3a8eef;
 }
 
+/* Volume control */
+.volume-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #ccc;
+}
+
+.volume-control label {
+    font-size: 0.85rem;
+}
+
+#volume-slider {
+    width: 160px;
+    appearance: none;
+    height: 4px;
+    background: #3a3a3a;
+    border-radius: 2px;
+    outline: none;
+}
+
+#volume-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4a9eff;
+    cursor: pointer;
+    border: none;
+}
+
+#volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4a9eff;
+    cursor: pointer;
+    border: none;
+}
+
+#volume-percentage {
+    font-variant-numeric: tabular-nums;
+    color: #aaa;
+    min-width: 40px;
+    text-align: right;
+}
+
 
 @media (max-width: 768px) {
     .app-header {

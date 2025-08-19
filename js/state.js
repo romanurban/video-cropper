@@ -6,6 +6,8 @@ class AppState {
             filename: '',
             videoMetadata: null,
             isPlaying: false,
+            volume: 1,
+            muted: false,
             currentTime: 0,
             duration: 0,
             isLoading: false,
@@ -75,6 +77,16 @@ class AppState {
         this.setState({ isPlaying });
     }
 
+    setVolume(volume) {
+        // Clamp volume between 0 and 1
+        const v = Math.max(0, Math.min(1, Number(volume)));
+        this.setState({ volume: v });
+    }
+
+    setMuted(muted) {
+        this.setState({ muted: Boolean(muted) });
+    }
+
     setCurrentTime(currentTime) {
         this.setState({ currentTime });
     }
@@ -93,6 +105,8 @@ class AppState {
             filename: '',
             videoMetadata: null,
             isPlaying: false,
+            volume: 1,
+            muted: false,
             currentTime: 0,
             duration: 0,
             isLoading: false,
