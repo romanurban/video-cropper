@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Editor - Sprint 0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Video Editor</h1>
+            <div class="metadata-panel" id="metadata-panel" style="display: none;">
+                <span id="filename"></span>
+                <span id="duration"></span>
+                <span id="resolution"></span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="drop-zone" id="drop-zone">
+                <div class="drop-zone-content">
+                    <p>Drag a video file here or</p>
+                    <button class="open-button" id="open-button">Choose File</button>
+                    <input type="file" id="file-input" accept="video/*" style="display: none;">
+                </div>
+            </div>
+
+            <div class="video-container" id="video-container" style="display: none;">
+                <video 
+                    id="video-element" 
+                    preload="metadata"
+                    style="display: none;"
+                ></video>
+                <canvas 
+                    id="canvas-element"
+                    class="video-canvas"
+                ></canvas>
+            </div>
+
+            <div class="controls-panel" id="controls-panel" style="display: none;">
+                <button id="play-pause-button">Play</button>
+                <input 
+                    type="range" 
+                    id="progress-slider" 
+                    min="0" 
+                    max="100" 
+                    value="0"
+                    class="progress-slider"
+                >
+                <span id="current-time">00:00</span>
+                <span>/</span>
+                <span id="total-time">00:00</span>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
