@@ -500,10 +500,36 @@ export class TimelineFrames {
                 this.currentTime = realCurrentTime;
                 this.updatePlayheadVisual();
             }
+            
+            // Ultra-precise selection boundary checking at 60fps
+            this.checkSelectionBoundaryUltraPrecise(realCurrentTime);
         }
         
         if (this.isPlayingVideo) {
             this.animationFrameId = requestAnimationFrame(this.smoothUpdateLoop);
+        }
+    }
+
+    checkSelectionBoundaryUltraPrecise(currentTime) {
+        if (!this.videoPlayer.isPlaying()) return;
+        
+        const selectionEndSec = appState.getState('selectionEndSec');
+        const selectionStartSec = appState.getState('selectionStartSec');
+        const isLooping = appState.getState('isLooping');
+        
+        // Stop at selection boundary if there's an active selection
+        if (selectionEndSec !== null && currentTime >= selectionEndSec - 0.005) {
+            if (isLooping) {
+                // Loop back to selection start or beginning
+                const loopStartTime = selectionStartSec !== null ? selectionStartSec : 0;
+                this.videoPlayer.seekTo(loopStartTime);
+            } else {
+                // Seek back 0.3 seconds from selection end
+                const seekBackTime = Math.max(selectionStartSec !== null ? selectionStartSec : 0, selectionEndSec - 0.3);
+                this.videoPlayer.pause();
+                this.videoPlayer.seekTo(seekBackTime);
+                this.stopSmoothUpdates(); // Stop the loop immediately
+            }
         }
     }
 

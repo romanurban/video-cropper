@@ -5,7 +5,6 @@ export class VideoPlayer {
     constructor(videoElement) {
         this.videoElement = videoElement;
         this.currentObjectURL = null;
-        this.isPlayingSelection = false;
         
         this.setupEventListeners();
         // Initialize audio properties from state
@@ -86,25 +85,6 @@ export class VideoPlayer {
     handleTimeUpdate() {
         const currentTime = this.videoElement.currentTime;
         appState.setCurrentTime(currentTime);
-        
-        // Handle looping and selection boundaries
-        if (this.isPlaying()) {
-            const selectionEndSec = appState.getState('selectionEndSec');
-            const selectionStartSec = appState.getState('selectionStartSec');
-            const isLooping = appState.getState('isLooping');
-            
-            if (selectionEndSec !== null && currentTime >= selectionEndSec - 0.05) {
-                if (isLooping) {
-                    // Loop back to selection start or beginning of video
-                    const loopStartTime = selectionStartSec !== null ? selectionStartSec : 0;
-                    this.seekTo(loopStartTime);
-                } else {
-                    this.pause();
-                    // Seek back to exact selection end
-                    this.seekTo(selectionEndSec);
-                }
-            }
-        }
     }
 
     handleEnded() {
@@ -115,8 +95,11 @@ export class VideoPlayer {
             this.seekTo(0);
             this.play();
         } else {
+            // Seek back 0.3 seconds from the end
+            const currentTime = this.videoElement.currentTime;
+            const seekBackTime = Math.max(0, currentTime - 0.3);
+            this.seekTo(seekBackTime);
             appState.setPlaybackState(false);
-            this.isPlayingSelection = false;
         }
     }
 
@@ -169,14 +152,13 @@ export class VideoPlayer {
         }
     }
 
+
     pause() {
         this.videoElement.pause();
-        this.isPlayingSelection = false;
     }
 
     playFromSelection(startTime) {
         this.seekTo(startTime);
-        this.isPlayingSelection = true;
         return this.play();
     }
 
@@ -225,7 +207,6 @@ export class VideoPlayer {
 
     cleanup() {
         this.pause();
-        this.isPlayingSelection = false;
         if (this.currentObjectURL) {
             safeRevokeObjectURL(this.currentObjectURL);
             this.currentObjectURL = null;

@@ -14,7 +14,6 @@ class AppState {
             error: null,
             selectionStartSec: null,
             selectionEndSec: null,
-            isLooping: false,
             isLooping: false
         };
     }
