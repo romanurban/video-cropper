@@ -35,7 +35,12 @@ class App {
             metadataPanel: document.getElementById('metadata-panel'),
             timelineSection: document.getElementById('timeline-section'),
             timelineFrames: document.getElementById('timeline-frames'),
+            seekBeginningButton: document.getElementById('seek-beginning-button'),
+            rewindButton: document.getElementById('rewind-button'),
             playPauseButton: document.getElementById('play-pause-button'),
+            stopButton: document.getElementById('stop-button'),
+            forwardButton: document.getElementById('forward-button'),
+            seekEndButton: document.getElementById('seek-end-button'),
             loopButton: document.getElementById('loop-button'),
             volumeSlider: document.getElementById('volume-slider'),
             volumePercent: document.getElementById('volume-percentage'),
@@ -110,6 +115,14 @@ class App {
     }
 
     setupVideoControls() {
+        this.elements.seekBeginningButton.addEventListener('click', () => {
+            this.videoPlayer.seekToBeginning();
+        });
+
+        this.elements.rewindButton.addEventListener('click', () => {
+            this.videoPlayer.rewind();
+        });
+
         this.elements.playPauseButton.addEventListener('click', () => {
             const isPlaying = appState.getState('isPlaying');
             if (isPlaying) {
@@ -117,6 +130,18 @@ class App {
             } else {
                 this.videoPlayer.play();
             }
+        });
+
+        this.elements.stopButton.addEventListener('click', () => {
+            this.videoPlayer.stop();
+        });
+
+        this.elements.forwardButton.addEventListener('click', () => {
+            this.videoPlayer.forward();
+        });
+
+        this.elements.seekEndButton.addEventListener('click', () => {
+            this.videoPlayer.seekToEnd();
         });
 
         this.elements.loopButton.addEventListener('click', () => {

@@ -157,6 +157,95 @@ export class VideoPlayer {
         this.videoElement.pause();
     }
 
+    stop() {
+        this.pause();
+        
+        const selectionStartSec = appState.getState('selectionStartSec');
+        const hasSelection = selectionStartSec !== null;
+        
+        if (hasSelection) {
+            this.seekTo(selectionStartSec);
+        } else {
+            this.seekTo(0);
+        }
+    }
+
+    seekToBeginning() {
+        const selectionStartSec = appState.getState('selectionStartSec');
+        const hasSelection = selectionStartSec !== null;
+        
+        if (hasSelection) {
+            this.seekTo(selectionStartSec);
+        } else {
+            this.seekTo(0);
+        }
+    }
+
+    seekToEnd() {
+        const selectionEndSec = appState.getState('selectionEndSec');
+        const hasSelection = selectionEndSec !== null;
+        
+        if (hasSelection) {
+            this.seekTo(selectionEndSec);
+        } else {
+            this.seekTo(this.getDuration());
+        }
+    }
+
+    getSmartSkipDuration() {
+        const selectionStartSec = appState.getState('selectionStartSec');
+        const selectionEndSec = appState.getState('selectionEndSec');
+        const hasSelection = selectionStartSec !== null && selectionEndSec !== null;
+        
+        let duration;
+        if (hasSelection) {
+            duration = selectionEndSec - selectionStartSec;
+        } else {
+            duration = this.getDuration();
+        }
+        
+        // Smart skip duration based on total duration
+        if (duration <= 1) {
+            return Math.max(0.1, duration * 0.1); // 10% of duration, min 0.1 second (100ms)
+        } else if (duration <= 5) {
+            return Math.max(0.2, duration * 0.08); // 8% of duration, min 0.2 second (200ms)
+        } else if (duration <= 10) {
+            return Math.max(0.5, duration * 0.05); // 5% of duration, min 0.5 second
+        } else if (duration <= 30) {
+            return Math.max(1, duration * 0.03); // 3% of duration, min 1 second
+        } else if (duration <= 300) { // 5 minutes
+            return Math.max(2, duration * 0.02); // 2% of duration, min 2 seconds
+        } else if (duration <= 1800) { // 30 minutes
+            return Math.max(5, duration * 0.015); // 1.5% of duration, min 5 seconds
+        } else {
+            return Math.max(10, duration * 0.01); // 1% of duration, min 10 seconds
+        }
+    }
+
+    rewind() {
+        const skipDuration = this.getSmartSkipDuration();
+        const currentTime = this.getCurrentTime();
+        const selectionStartSec = appState.getState('selectionStartSec');
+        const hasSelection = selectionStartSec !== null;
+        
+        const minTime = hasSelection ? selectionStartSec : 0;
+        const newTime = Math.max(minTime, currentTime - skipDuration);
+        
+        this.seekTo(newTime);
+    }
+
+    forward() {
+        const skipDuration = this.getSmartSkipDuration();
+        const currentTime = this.getCurrentTime();
+        const selectionEndSec = appState.getState('selectionEndSec');
+        const hasSelection = selectionEndSec !== null;
+        
+        const maxTime = hasSelection ? selectionEndSec : this.getDuration();
+        const newTime = Math.min(maxTime, currentTime + skipDuration);
+        
+        this.seekTo(newTime);
+    }
+
     playFromSelection(startTime) {
         this.seekTo(startTime);
         return this.play();
