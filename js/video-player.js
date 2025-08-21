@@ -87,20 +87,37 @@ export class VideoPlayer {
         const currentTime = this.videoElement.currentTime;
         appState.setCurrentTime(currentTime);
         
-        // Stop at selection end if selection is present
+        // Handle looping and selection boundaries
         if (this.isPlaying()) {
             const selectionEndSec = appState.getState('selectionEndSec');
+            const selectionStartSec = appState.getState('selectionStartSec');
+            const isLooping = appState.getState('isLooping');
+            
             if (selectionEndSec !== null && currentTime >= selectionEndSec - 0.05) {
-                this.pause();
-                // Seek back to exact selection end
-                this.seekTo(selectionEndSec);
+                if (isLooping) {
+                    // Loop back to selection start or beginning of video
+                    const loopStartTime = selectionStartSec !== null ? selectionStartSec : 0;
+                    this.seekTo(loopStartTime);
+                } else {
+                    this.pause();
+                    // Seek back to exact selection end
+                    this.seekTo(selectionEndSec);
+                }
             }
         }
     }
 
     handleEnded() {
-        appState.setPlaybackState(false);
-        this.isPlayingSelection = false;
+        const isLooping = appState.getState('isLooping');
+        
+        if (isLooping) {
+            // Loop back to beginning of video
+            this.seekTo(0);
+            this.play();
+        } else {
+            appState.setPlaybackState(false);
+            this.isPlayingSelection = false;
+        }
     }
 
     handleError() {

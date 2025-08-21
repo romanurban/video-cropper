@@ -13,7 +13,9 @@ class AppState {
             isLoading: false,
             error: null,
             selectionStartSec: null,
-            selectionEndSec: null
+            selectionEndSec: null,
+            isLooping: false,
+            isLooping: false
         };
     }
 
@@ -130,6 +132,10 @@ class AppState {
         this.emit('selection', null);
     }
 
+    setLooping(isLooping) {
+        this.setState({ isLooping: Boolean(isLooping) });
+    }
+
     reset() {
         this.setState({
             file: null,
@@ -143,7 +149,8 @@ class AppState {
             isLoading: false,
             error: null,
             selectionStartSec: null,
-            selectionEndSec: null
+            selectionEndSec: null,
+            isLooping: false
         });
     }
 }

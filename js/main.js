@@ -36,6 +36,7 @@ class App {
             timelineSection: document.getElementById('timeline-section'),
             timelineFrames: document.getElementById('timeline-frames'),
             playPauseButton: document.getElementById('play-pause-button'),
+            loopButton: document.getElementById('loop-button'),
             volumeSlider: document.getElementById('volume-slider'),
             volumePercent: document.getElementById('volume-percentage'),
             filenameDisplay: document.getElementById('filename'),
@@ -117,6 +118,12 @@ class App {
                 this.videoPlayer.play();
             }
         });
+
+        this.elements.loopButton.addEventListener('click', () => {
+            const isLooping = appState.getState('isLooping');
+            appState.setLooping(!isLooping);
+        });
+
         if (this.elements.volumeSlider) {
             const updateLabel = (percent) => {
                 if (this.elements.volumePercent) {
@@ -207,6 +214,16 @@ class App {
                 this.elements.selectionInfo.style.display = 'flex';
             } else {
                 this.elements.selectionInfo.style.display = 'none';
+            }
+        });
+
+        appState.subscribe('isLooping', (isLooping) => {
+            if (isLooping) {
+                this.elements.loopButton.classList.add('active');
+                this.elements.loopButton.title = 'Loop enabled - click to disable';
+            } else {
+                this.elements.loopButton.classList.remove('active');
+                this.elements.loopButton.title = 'Loop disabled - click to enable';
             }
         });
     }
