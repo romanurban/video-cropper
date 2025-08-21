@@ -27,6 +27,8 @@ export class TimelineFrames {
         this.resizeHandleWidth = 4; // Width of resize handle in pixels
         this.animationFrameId = null;
         this.isPlayingVideo = false;
+        this.lastClickTime = 0;
+        this.clickDebounceMs = 50; // Prevent rapid clicks from interfering
         
         this.handleResize = debounce(this.updateLayout.bind(this), 200);
         this.handlePointerMove = this.handlePointerMove.bind(this);
@@ -267,12 +269,20 @@ export class TimelineFrames {
             return null;
         }
         
+        // Force layout recalculation for accurate positioning
+        this.frameStrip.offsetWidth; // Trigger reflow
+        
         const rect = this.frameStrip.getBoundingClientRect();
+        const rectWidth = Math.round(rect.width);
+        
+        // Ensure we have valid dimensions
+        if (rectWidth <= 0) return null;
+        
         const startPercentage = this.selectionStartSec / this.duration;
         const endPercentage = this.selectionEndSec / this.duration;
         
-        const startX = startPercentage * rect.width;
-        const endX = endPercentage * rect.width;
+        const startX = Math.round(startPercentage * rectWidth);
+        const endX = Math.round(endPercentage * rectWidth);
         
         // Check if near start handle
         if (Math.abs(x - startX) <= this.resizeHandleWidth / 2) {
@@ -291,7 +301,7 @@ export class TimelineFrames {
         if (this.isDragging || this.isSelecting || this.isResizing) return;
         
         const rect = this.frameStrip.getBoundingClientRect();
-        const x = event.clientX - rect.left;
+        const x = Math.round(event.clientX - rect.left);
         const resizeHandle = this.getResizeHandle(x);
         
         if (resizeHandle) {
@@ -315,12 +325,41 @@ export class TimelineFrames {
         if (event.button !== 0) return; // Only handle left click
         if (!this.duration || this.duration <= 0) return; // Disable if no metadata
         
+        // Debounce rapid clicks
+        const now = Date.now();
+        if (now - this.lastClickTime < this.clickDebounceMs) return;
+        this.lastClickTime = now;
+        
         event.preventDefault();
         
+        // Force layout recalculation to ensure accurate positioning
+        this.frameStrip.offsetWidth; // Trigger reflow
+        
         const rect = this.frameStrip.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const percentage = clamp(x / rect.width, 0, 1);
-        const clickTime = percentage * this.duration;
+        const x = Math.round(event.clientX - rect.left);
+        const rectWidth = Math.round(rect.width);
+        
+        // Ensure we have valid dimensions
+        if (rectWidth <= 0) {
+            console.warn('Timeline width is 0, cannot process click');
+            return;
+        }
+        
+        // Ensure click is within bounds
+        if (x < 0 || x > rectWidth) {
+            console.warn('Click outside timeline bounds');
+            return;
+        }
+        
+        const percentage = clamp(x / rectWidth, 0, 1);
+        const clickTime = Math.round((percentage * this.duration) * 1000) / 1000; // Round to millisecond precision
+        
+        // Debug logging for troubleshooting (uncomment if needed)
+        // console.debug('Timeline click:', { x, rectWidth, percentage, clickTime, duration: this.duration });
+        
+        // Provide immediate visual feedback for any click, regardless of what happens next
+        this.currentTime = clickTime;
+        this.updatePlayheadVisual();
         
         // Check if clicking on a resize handle
         const resizeHandle = this.getResizeHandle(x);
@@ -367,10 +406,18 @@ export class TimelineFrames {
         
         event.preventDefault();
         
+        // Force layout recalculation for accurate positioning
+        this.frameStrip.offsetWidth; // Trigger reflow
+        
         const rect = this.frameStrip.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const percentage = clamp(x / rect.width, 0, 1);
-        const currentTime = percentage * this.duration;
+        const x = Math.round(event.clientX - rect.left);
+        const rectWidth = Math.round(rect.width);
+        
+        // Ensure we have valid dimensions
+        if (rectWidth <= 0) return;
+        
+        const percentage = clamp(x / rectWidth, 0, 1);
+        const currentTime = Math.round((percentage * this.duration) * 1000) / 1000; // Round to millisecond precision
         
         if (this.isResizing) {
             // Handle selection resize
@@ -398,6 +445,14 @@ export class TimelineFrames {
                 const endSec = Math.max(this.selectionAnchor, currentTime);
                 
                 this.updateSelectionPreview(startSec, endSec);
+                
+                // Update playhead position to follow the drag for immediate visual feedback
+                this.currentTime = currentTime;
+                this.updatePlayheadVisual();
+            } else {
+                // For small movements (not yet selecting), still update playhead position for responsiveness
+                this.currentTime = currentTime;
+                this.updatePlayheadVisual();
             }
         }
     }
@@ -414,10 +469,18 @@ export class TimelineFrames {
         
         if (this.isResizing && this.resizeHandle) {
             // Finalize resize
+            // Force layout recalculation for accurate positioning
+            this.frameStrip.offsetWidth; // Trigger reflow
+            
             const rect = this.frameStrip.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const percentage = clamp(x / rect.width, 0, 1);
-            const currentTime = percentage * this.duration;
+            const x = Math.round(event.clientX - rect.left);
+            const rectWidth = Math.round(rect.width);
+            
+            // Ensure we have valid dimensions
+            if (rectWidth <= 0) return;
+            
+            const percentage = clamp(x / rectWidth, 0, 1);
+            const currentTime = Math.round((percentage * this.duration) * 1000) / 1000; // Round to millisecond precision
             
             let newStartSec = this.selectionStartSec;
             let newEndSec = this.selectionEndSec;
@@ -438,10 +501,18 @@ export class TimelineFrames {
             this.frameStrip.removeAttribute('data-cursor');
         } else if (this.isSelecting && this.selectionAnchor !== null) {
             // Finalize new selection
+            // Force layout recalculation for accurate positioning
+            this.frameStrip.offsetWidth; // Trigger reflow
+            
             const rect = this.frameStrip.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const percentage = clamp(x / rect.width, 0, 1);
-            const endTime = percentage * this.duration;
+            const x = Math.round(event.clientX - rect.left);
+            const rectWidth = Math.round(rect.width);
+            
+            // Ensure we have valid dimensions
+            if (rectWidth <= 0) return;
+            
+            const percentage = clamp(x / rectWidth, 0, 1);
+            const endTime = Math.round((percentage * this.duration) * 1000) / 1000; // Round to millisecond precision
             
             const startSec = Math.min(this.selectionAnchor, endTime);
             const endSec = Math.max(this.selectionAnchor, endTime);
@@ -467,11 +538,26 @@ export class TimelineFrames {
     }
 
     handleSeek(seekTime) {
-        this.currentTime = seekTime;
-        this.updatePlayhead();
+        // Clamp seek time to valid range
+        const clampedSeekTime = clamp(seekTime, 0, this.duration);
+        
+        // console.debug('Seeking to:', { original: seekTime, clamped: clampedSeekTime });
+        
+        this.currentTime = clampedSeekTime;
+        
+        // Force immediate visual update, bypassing drag/resize checks
+        this.updatePlayheadVisual();
         
         if (this.videoPlayer) {
-            this.videoPlayer.seekTo(seekTime);
+            // Use requestAnimationFrame to ensure DOM is ready for seek
+            requestAnimationFrame(() => {
+                this.videoPlayer.seekTo(clampedSeekTime);
+                
+                // Force another visual update after seek to ensure sync
+                requestAnimationFrame(() => {
+                    this.updatePlayheadVisual();
+                });
+            });
         }
         
         // Pause thumbnail generation during dragging
@@ -622,6 +708,7 @@ export class TimelineFrames {
         this.resizeHandle = null;
         this.selectionAnchor = null;
         this.isPlayingVideo = false;
+        this.lastClickTime = 0;
         if (this.selectionOverlay) {
             this.selectionOverlay.style.display = 'none';
         }
