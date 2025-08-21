@@ -11,7 +11,9 @@ class AppState {
             currentTime: 0,
             duration: 0,
             isLoading: false,
-            error: null
+            error: null,
+            selectionStartSec: null,
+            selectionEndSec: null
         };
     }
 
@@ -99,6 +101,35 @@ class AppState {
         this.setState({ error });
     }
 
+    setSelection(startSec, endSec) {
+        if (startSec === null || endSec === null) {
+            this.clearSelection();
+            return;
+        }
+        
+        const minTime = Math.min(startSec, endSec);
+        const maxTime = Math.max(startSec, endSec);
+        
+        this.setState({ 
+            selectionStartSec: minTime,
+            selectionEndSec: maxTime 
+        });
+        
+        this.emit('selection', { 
+            startSec: minTime, 
+            endSec: maxTime 
+        });
+    }
+
+    clearSelection() {
+        this.setState({ 
+            selectionStartSec: null,
+            selectionEndSec: null 
+        });
+        
+        this.emit('selection', null);
+    }
+
     reset() {
         this.setState({
             file: null,
@@ -110,7 +141,9 @@ class AppState {
             currentTime: 0,
             duration: 0,
             isLoading: false,
-            error: null
+            error: null,
+            selectionStartSec: null,
+            selectionEndSec: null
         });
     }
 }

@@ -40,7 +40,11 @@ class App {
             volumePercent: document.getElementById('volume-percentage'),
             filenameDisplay: document.getElementById('filename'),
             durationDisplay: document.getElementById('duration'),
-            resolutionDisplay: document.getElementById('resolution')
+            resolutionDisplay: document.getElementById('resolution'),
+            selectionInfo: document.getElementById('selection-info'),
+            selectionStart: document.getElementById('selection-start'),
+            selectionEnd: document.getElementById('selection-end'),
+            selectionDuration: document.getElementById('selection-duration')
         };
     }
 
@@ -84,6 +88,7 @@ class App {
 
         this.setupDragAndDrop();
         this.setupVideoControls();
+        this.setupKeyboardControls();
     }
 
     setupDragAndDrop() {
@@ -131,6 +136,27 @@ class App {
         }
     }
 
+    setupKeyboardControls() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                appState.clearSelection();
+            } else if (e.key === ' ' && e.shiftKey) {
+                e.preventDefault();
+                this.playFromSelectionStart();
+            }
+        });
+    }
+
+    playFromSelectionStart() {
+        const selectionStartSec = appState.getState('selectionStartSec');
+        const selectionEndSec = appState.getState('selectionEndSec');
+        
+        if (selectionStartSec !== null && selectionEndSec !== null) {
+            // Use the new playFromSelection method for proper selection playback
+            this.videoPlayer.playFromSelection(selectionStartSec);
+        }
+    }
+
     setupStateSubscriptions() {
         appState.subscribe('file', (file) => {
             if (file) {
@@ -170,6 +196,17 @@ class App {
         appState.subscribe('error', (error) => {
             if (error) {
                 this.showError(error);
+            }
+        });
+
+        appState.subscribe('selection', (selection) => {
+            if (selection) {
+                this.elements.selectionStart.textContent = formatTime(selection.startSec);
+                this.elements.selectionEnd.textContent = formatTime(selection.endSec);
+                this.elements.selectionDuration.textContent = formatTime(selection.endSec - selection.startSec);
+                this.elements.selectionInfo.style.display = 'flex';
+            } else {
+                this.elements.selectionInfo.style.display = 'none';
             }
         });
     }

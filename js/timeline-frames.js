@@ -9,17 +9,27 @@ export class TimelineFrames {
         this.thumbnailService = new ThumbnailService();
         this.frameStrip = null;
         this.playhead = null;
-        this.progressOverlay = null;
+        this.progressLine = null;
+        this.progressTrack = null;
         this.thumbnailsContainer = null;
+        this.selectionOverlay = null;
         this.duration = 0;
         this.currentTime = 0;
         this.thumbnails = [];
         this.isDragging = false;
+        this.isSelecting = false;
+        this.isResizing = false;
+        this.resizeHandle = null; // 'start' or 'end'
+        this.selectionAnchor = null;
+        this.selectionStartSec = null;
+        this.selectionEndSec = null;
         this.stripWidth = 0;
+        this.resizeHandleWidth = 4; // Width of resize handle in pixels
         
         this.handleResize = debounce(this.updateLayout.bind(this), 200);
         this.handlePointerMove = this.handlePointerMove.bind(this);
         this.handlePointerUp = this.handlePointerUp.bind(this);
+        this.handleMouseMove = this.handleMouseMove.bind(this);
         
         this.init();
     }
@@ -34,25 +44,48 @@ export class TimelineFrames {
         this.frameStrip = document.createElement('div');
         this.frameStrip.className = 'frame-strip';
         this.frameStrip.setAttribute('role', 'application');
-        this.frameStrip.setAttribute('aria-label', 'Video timeline - click to seek');
+        this.frameStrip.setAttribute('aria-label', 'Video timeline - click to seek, drag to select');
+        this.frameStrip.setAttribute('tabindex', '0');
         
         this.thumbnailsContainer = document.createElement('div');
         this.thumbnailsContainer.className = 'thumbnails-container';
         
-        this.progressOverlay = document.createElement('div');
-        this.progressOverlay.className = 'progress-overlay';
-        
         this.playhead = document.createElement('div');
         this.playhead.className = 'timeline-playhead-frames';
         
+        this.selectionOverlay = document.createElement('div');
+        this.selectionOverlay.className = 'timeline-selection-overlay';
+        this.selectionOverlay.setAttribute('aria-label', 'Selected range');
+        this.selectionOverlay.setAttribute('aria-live', 'polite');
+        this.selectionOverlay.style.display = 'none';
+        
+        this.progressTrack = document.createElement('div');
+        this.progressTrack.className = 'timeline-progress-track';
+        
+        this.progressLine = document.createElement('div');
+        this.progressLine.className = 'timeline-progress-line';
+        this.progressLine.style.width = '0%';
+        
         this.frameStrip.appendChild(this.thumbnailsContainer);
-        this.frameStrip.appendChild(this.progressOverlay);
+        this.frameStrip.appendChild(this.selectionOverlay);
         this.frameStrip.appendChild(this.playhead);
+        
+        this.progressTrack.appendChild(this.progressLine);
+        
         this.container.appendChild(this.frameStrip);
+        
+        // Add progress track to the parent timeline section instead of timeline-frames container
+        const timelineSection = this.container.parentElement;
+        if (timelineSection) {
+            timelineSection.appendChild(this.progressTrack);
+        } else {
+            this.container.appendChild(this.progressTrack);
+        }
     }
 
     setupEventListeners() {
         this.frameStrip.addEventListener('pointerdown', this.handlePointerDown.bind(this));
+        this.frameStrip.addEventListener('mousemove', this.handleMouseMove);
         window.addEventListener('resize', this.handleResize);
         
         const resizeObserver = new ResizeObserver(() => {
@@ -82,7 +115,7 @@ export class TimelineFrames {
 
         appState.subscribe('currentTime', (currentTime) => {
             this.currentTime = currentTime;
-            if (!this.isDragging) {
+            if (!this.isDragging && !this.isResizing) {
                 this.updatePlayhead();
             }
         });
@@ -93,6 +126,17 @@ export class TimelineFrames {
             } else {
                 this.thumbnailService.resumeGeneration(this.onThumbnailGenerated.bind(this));
             }
+        });
+
+        appState.subscribe('selection', (selection) => {
+            if (selection) {
+                this.selectionStartSec = selection.startSec;
+                this.selectionEndSec = selection.endSec;
+            } else {
+                this.selectionStartSec = null;
+                this.selectionEndSec = null;
+            }
+            this.updateSelectionDisplay();
         });
     }
 
@@ -212,44 +256,211 @@ export class TimelineFrames {
         };
     }
 
+    getResizeHandle(x) {
+        if (this.selectionStartSec === null || this.selectionEndSec === null || !this.duration) {
+            return null;
+        }
+        
+        const rect = this.frameStrip.getBoundingClientRect();
+        const startPercentage = this.selectionStartSec / this.duration;
+        const endPercentage = this.selectionEndSec / this.duration;
+        
+        const startX = startPercentage * rect.width;
+        const endX = endPercentage * rect.width;
+        
+        // Check if near start handle
+        if (Math.abs(x - startX) <= this.resizeHandleWidth / 2) {
+            return 'start';
+        }
+        
+        // Check if near end handle
+        if (Math.abs(x - endX) <= this.resizeHandleWidth / 2) {
+            return 'end';
+        }
+        
+        return null;
+    }
+
+    handleMouseMove(event) {
+        if (this.isDragging || this.isSelecting || this.isResizing) return;
+        
+        const rect = this.frameStrip.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const resizeHandle = this.getResizeHandle(x);
+        
+        if (resizeHandle) {
+            this.frameStrip.setAttribute('data-cursor', 'col-resize');
+        } else if (this.selectionStartSec !== null && this.selectionEndSec !== null) {
+            const percentage = clamp(x / rect.width, 0, 1);
+            const time = percentage * this.duration;
+            
+            // Check if inside selection for move cursor
+            if (time >= this.selectionStartSec && time <= this.selectionEndSec) {
+                this.frameStrip.setAttribute('data-cursor', 'grab');
+            } else {
+                this.frameStrip.removeAttribute('data-cursor');
+            }
+        } else {
+            this.frameStrip.removeAttribute('data-cursor');
+        }
+    }
+
     handlePointerDown(event) {
         if (event.button !== 0) return; // Only handle left click
+        if (!this.duration || this.duration <= 0) return; // Disable if no metadata
         
         event.preventDefault();
+        
+        const rect = this.frameStrip.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const percentage = clamp(x / rect.width, 0, 1);
+        const clickTime = percentage * this.duration;
+        
+        // Check if clicking on a resize handle
+        const resizeHandle = this.getResizeHandle(x);
+        if (resizeHandle) {
+            this.isResizing = true;
+            this.resizeHandle = resizeHandle;
+            this.frameStrip.setAttribute('data-cursor', 'col-resize');
+            
+            this.frameStrip.setPointerCapture(event.pointerId);
+            this.frameStrip.addEventListener('pointermove', this.handlePointerMove);
+            this.frameStrip.addEventListener('pointerup', this.handlePointerUp);
+            return;
+        }
+        
+        // Check if clicking inside existing selection (for future move functionality)
+        if (this.selectionStartSec !== null && this.selectionEndSec !== null &&
+            clickTime >= this.selectionStartSec && clickTime <= this.selectionEndSec) {
+            // For now, just seek within selection
+            this.handleSeek(clickTime);
+            return;
+        }
+        
+        // Check if clicking outside existing selection to clear it
+        if (this.selectionStartSec !== null && this.selectionEndSec !== null &&
+            (clickTime < this.selectionStartSec || clickTime > this.selectionEndSec)) {
+            // Clear selection if clicking outside
+            appState.clearSelection();
+        }
+        
+        // Start new selection or seek
         this.isDragging = true;
+        this.selectionAnchor = clickTime;
         
         this.frameStrip.setPointerCapture(event.pointerId);
         this.frameStrip.addEventListener('pointermove', this.handlePointerMove);
         this.frameStrip.addEventListener('pointerup', this.handlePointerUp);
         
-        this.handleSeek(event);
+        // For now, just seek to the position
+        this.handleSeek(clickTime);
     }
 
     handlePointerMove(event) {
-        if (!this.isDragging) return;
+        if (!this.isDragging && !this.isResizing) return;
         
         event.preventDefault();
-        this.handleSeek(event);
+        
+        const rect = this.frameStrip.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const percentage = clamp(x / rect.width, 0, 1);
+        const currentTime = percentage * this.duration;
+        
+        if (this.isResizing) {
+            // Handle selection resize
+            let newStartSec = this.selectionStartSec;
+            let newEndSec = this.selectionEndSec;
+            
+            if (this.resizeHandle === 'start') {
+                newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.1);
+            } else if (this.resizeHandle === 'end') {
+                newEndSec = clamp(currentTime, this.selectionStartSec + 0.1, this.duration);
+            }
+            
+            this.updateSelectionPreview(newStartSec, newEndSec);
+        } else {
+            // Handle new selection creation
+            const anchorPercentage = this.selectionAnchor / this.duration;
+            const anchorX = anchorPercentage * rect.width;
+            const dragDistance = Math.abs(x - anchorX);
+            
+            if (dragDistance > 2) {
+                this.isSelecting = true;
+                
+                // Update selection preview
+                const startSec = Math.min(this.selectionAnchor, currentTime);
+                const endSec = Math.max(this.selectionAnchor, currentTime);
+                
+                this.updateSelectionPreview(startSec, endSec);
+            }
+        }
     }
 
     handlePointerUp(event) {
-        if (!this.isDragging) return;
+        if (!this.isDragging && !this.isResizing) return;
+        
+        event.preventDefault();
         
         this.isDragging = false;
         this.frameStrip.releasePointerCapture(event.pointerId);
         this.frameStrip.removeEventListener('pointermove', this.handlePointerMove);
         this.frameStrip.removeEventListener('pointerup', this.handlePointerUp);
         
+        if (this.isResizing && this.resizeHandle) {
+            // Finalize resize
+            const rect = this.frameStrip.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const percentage = clamp(x / rect.width, 0, 1);
+            const currentTime = percentage * this.duration;
+            
+            let newStartSec = this.selectionStartSec;
+            let newEndSec = this.selectionEndSec;
+            
+            if (this.resizeHandle === 'start') {
+                newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.1);
+            } else if (this.resizeHandle === 'end') {
+                newEndSec = clamp(currentTime, this.selectionStartSec + 0.1, this.duration);
+            }
+            
+            appState.setSelection(newStartSec, newEndSec);
+            
+            // Seek to the beginning of the resized selection
+            this.handleSeek(newStartSec);
+            
+            this.isResizing = false;
+            this.resizeHandle = null;
+            this.frameStrip.removeAttribute('data-cursor');
+        } else if (this.isSelecting && this.selectionAnchor !== null) {
+            // Finalize new selection
+            const rect = this.frameStrip.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const percentage = clamp(x / rect.width, 0, 1);
+            const endTime = percentage * this.duration;
+            
+            const startSec = Math.min(this.selectionAnchor, endTime);
+            const endSec = Math.max(this.selectionAnchor, endTime);
+            
+            // Only create selection if there's meaningful duration (minimum 0.1 seconds)
+            const minSelectionDuration = 0.1;
+            if (Math.abs(endSec - startSec) >= minSelectionDuration) {
+                // Clamp selection to video bounds
+                const clampedStartSec = clamp(startSec, 0, this.duration);
+                const clampedEndSec = clamp(endSec, 0, this.duration);
+                appState.setSelection(clampedStartSec, clampedEndSec);
+                
+                // Seek to the beginning of the selection
+                this.handleSeek(clampedStartSec);
+            }
+        }
+        
+        this.isSelecting = false;
+        this.selectionAnchor = null;
+        
         // Resume thumbnail generation if paused
         this.thumbnailService.resumeGeneration(this.onThumbnailGenerated.bind(this));
     }
 
-    handleSeek(event) {
-        const rect = this.frameStrip.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const percentage = clamp(x / rect.width, 0, 1);
-        const seekTime = percentage * this.duration;
-        
+    handleSeek(seekTime) {
         this.currentTime = seekTime;
         this.updatePlayhead();
         
@@ -270,7 +481,46 @@ export class TimelineFrames {
         const clampedPercentage = clamp(percentage, 0, 100);
         
         this.playhead.style.left = `${clampedPercentage}%`;
-        this.progressOverlay.style.width = `${clampedPercentage}%`;
+        if (this.progressLine) {
+            this.progressLine.style.width = `${clampedPercentage}%`;
+        }
+    }
+
+    updateSelectionPreview(startSec, endSec) {
+        if (!this.duration || this.duration <= 0) return;
+        
+        const startPercentage = (startSec / this.duration) * 100;
+        const endPercentage = (endSec / this.duration) * 100;
+        const width = endPercentage - startPercentage;
+        
+        this.selectionOverlay.style.display = 'block';
+        this.selectionOverlay.style.left = `${startPercentage}%`;
+        this.selectionOverlay.style.width = `${width}%`;
+    }
+
+    updateSelectionDisplay() {
+        if (!this.duration || this.duration <= 0) {
+            this.selectionOverlay.style.display = 'none';
+            return;
+        }
+        
+        if (this.selectionStartSec === null || this.selectionEndSec === null) {
+            this.selectionOverlay.style.display = 'none';
+            return;
+        }
+        
+        const startPercentage = (this.selectionStartSec / this.duration) * 100;
+        const endPercentage = (this.selectionEndSec / this.duration) * 100;
+        const width = endPercentage - startPercentage;
+        
+        this.selectionOverlay.style.display = 'block';
+        this.selectionOverlay.style.left = `${startPercentage}%`;
+        this.selectionOverlay.style.width = `${width}%`;
+        
+        // Update aria-label for accessibility
+        const duration = this.selectionEndSec - this.selectionStartSec;
+        this.selectionOverlay.setAttribute('aria-label', 
+            `Selected range from ${formatTime(this.selectionStartSec)} to ${formatTime(this.selectionEndSec)}, duration ${formatTime(duration)}`);
     }
 
     updateLayout() {
@@ -292,6 +542,18 @@ export class TimelineFrames {
         this.duration = 0;
         this.currentTime = 0;
         this.thumbnails = [];
+        this.selectionStartSec = null;
+        this.selectionEndSec = null;
+        this.isSelecting = false;
+        this.isResizing = false;
+        this.resizeHandle = null;
+        this.selectionAnchor = null;
+        if (this.selectionOverlay) {
+            this.selectionOverlay.style.display = 'none';
+        }
+        if (this.frameStrip) {
+            this.frameStrip.removeAttribute('data-cursor');
+        }
     }
 
     destroy() {
@@ -301,6 +563,11 @@ export class TimelineFrames {
         
         if (this.container && this.frameStrip) {
             this.container.removeChild(this.frameStrip);
+        }
+        
+        // Clean up progress track
+        if (this.progressTrack && this.progressTrack.parentElement) {
+            this.progressTrack.parentElement.removeChild(this.progressTrack);
         }
     }
 }

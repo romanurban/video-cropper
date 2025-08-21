@@ -5,6 +5,7 @@ export class VideoPlayer {
     constructor(videoElement) {
         this.videoElement = videoElement;
         this.currentObjectURL = null;
+        this.isPlayingSelection = false;
         
         this.setupEventListeners();
         // Initialize audio properties from state
@@ -83,11 +84,22 @@ export class VideoPlayer {
     }
 
     handleTimeUpdate() {
-        appState.setCurrentTime(this.videoElement.currentTime);
+        const currentTime = this.videoElement.currentTime;
+        appState.setCurrentTime(currentTime);
+        
+        // Check if we should stop at selection end (for any playback when selection exists)
+        if (this.isPlaying()) {
+            const selectionEndSec = appState.getState('selectionEndSec');
+            if (selectionEndSec !== null && currentTime >= selectionEndSec) {
+                this.pause();
+                this.isPlayingSelection = false;
+            }
+        }
     }
 
     handleEnded() {
         appState.setPlaybackState(false);
+        this.isPlayingSelection = false;
     }
 
     handleError() {
@@ -141,6 +153,13 @@ export class VideoPlayer {
 
     pause() {
         this.videoElement.pause();
+        this.isPlayingSelection = false;
+    }
+
+    playFromSelection(startTime) {
+        this.seekTo(startTime);
+        this.isPlayingSelection = true;
+        return this.play();
     }
 
     setVolume(volume) {
@@ -188,6 +207,7 @@ export class VideoPlayer {
 
     cleanup() {
         this.pause();
+        this.isPlayingSelection = false;
         if (this.currentObjectURL) {
             safeRevokeObjectURL(this.currentObjectURL);
             this.currentObjectURL = null;
