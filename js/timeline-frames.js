@@ -25,11 +25,14 @@ export class TimelineFrames {
         this.selectionEndSec = null;
         this.stripWidth = 0;
         this.resizeHandleWidth = 4; // Width of resize handle in pixels
+        this.animationFrameId = null;
+        this.isPlayingVideo = false;
         
         this.handleResize = debounce(this.updateLayout.bind(this), 200);
         this.handlePointerMove = this.handlePointerMove.bind(this);
         this.handlePointerUp = this.handlePointerUp.bind(this);
         this.handleMouseMove = this.handleMouseMove.bind(this);
+        this.smoothUpdateLoop = this.smoothUpdateLoop.bind(this);
         
         this.init();
     }
@@ -121,10 +124,13 @@ export class TimelineFrames {
         });
 
         appState.subscribe('isPlaying', (isPlaying) => {
+            this.isPlayingVideo = isPlaying;
             if (isPlaying) {
                 this.thumbnailService.pauseGeneration();
+                this.startSmoothUpdates();
             } else {
                 this.thumbnailService.resumeGeneration(this.onThumbnailGenerated.bind(this));
+                this.stopSmoothUpdates();
             }
         });
 
@@ -474,15 +480,55 @@ export class TimelineFrames {
         }
     }
 
+    startSmoothUpdates() {
+        if (this.animationFrameId) return; // Already running
+        this.smoothUpdateLoop();
+    }
+
+    stopSmoothUpdates() {
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+
+    smoothUpdateLoop() {
+        if (this.isPlayingVideo && this.videoPlayer) {
+            // Get real-time position from video element
+            const realCurrentTime = this.videoPlayer.getCurrentTime();
+            if (Math.abs(realCurrentTime - this.currentTime) > 0.01) {
+                this.currentTime = realCurrentTime;
+                this.updatePlayheadVisual();
+            }
+        }
+        
+        if (this.isPlayingVideo) {
+            this.animationFrameId = requestAnimationFrame(this.smoothUpdateLoop);
+        }
+    }
+
     updatePlayhead() {
+        if (!this.isDragging && !this.isResizing) {
+            this.updatePlayheadVisual();
+        }
+    }
+
+    updatePlayheadVisual() {
         if (!this.duration || this.duration <= 0) return;
         
         const percentage = (this.currentTime / this.duration) * 100;
         const clampedPercentage = clamp(percentage, 0, 100);
         
         this.playhead.style.left = `${clampedPercentage}%`;
+        
         if (this.progressLine) {
-            this.progressLine.style.width = `${clampedPercentage}%`;
+            // If there's a selection, limit progress line to selection end
+            let progressPercentage = clampedPercentage;
+            if (this.selectionStartSec !== null && this.selectionEndSec !== null) {
+                const selectionEndPercentage = (this.selectionEndSec / this.duration) * 100;
+                progressPercentage = Math.min(clampedPercentage, selectionEndPercentage);
+            }
+            this.progressLine.style.width = `${progressPercentage}%`;
         }
     }
 
@@ -539,6 +585,7 @@ export class TimelineFrames {
     reset() {
         this.clearThumbnails();
         this.thumbnailService.cleanup();
+        this.stopSmoothUpdates();
         this.duration = 0;
         this.currentTime = 0;
         this.thumbnails = [];
@@ -548,6 +595,7 @@ export class TimelineFrames {
         this.isResizing = false;
         this.resizeHandle = null;
         this.selectionAnchor = null;
+        this.isPlayingVideo = false;
         if (this.selectionOverlay) {
             this.selectionOverlay.style.display = 'none';
         }

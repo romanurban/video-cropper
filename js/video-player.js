@@ -87,12 +87,13 @@ export class VideoPlayer {
         const currentTime = this.videoElement.currentTime;
         appState.setCurrentTime(currentTime);
         
-        // Check if we should stop at selection end (for any playback when selection exists)
+        // Stop at selection end if selection is present
         if (this.isPlaying()) {
             const selectionEndSec = appState.getState('selectionEndSec');
-            if (selectionEndSec !== null && currentTime >= selectionEndSec) {
+            if (selectionEndSec !== null && currentTime >= selectionEndSec - 0.05) {
                 this.pause();
-                this.isPlayingSelection = false;
+                // Seek back to exact selection end
+                this.seekTo(selectionEndSec);
             }
         }
     }
