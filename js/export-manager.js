@@ -213,11 +213,13 @@ export class ExportManager {
             throw new Error('FFmpeg worker not initialized');
         }
         
+        const durationSec = appState.getState('videoMetadata')?.duration ?? null;
         this.ffmpegWorker.postMessage({
             type: 'export',
             id: this.currentExportId,
             file,
             operations,
+            durationSec,
             preset
         });
     }

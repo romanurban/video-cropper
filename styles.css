@@ -440,7 +440,7 @@ body {
     gap: 0.75rem;
     color: #ffc107;
     font-size: 0.85rem;
-    margin-left: 1rem;
+    margin-left: auto;
     padding: 0.4rem 0.8rem;
     background: rgba(255, 193, 7, 0.1);
     border: 1px solid rgba(255, 193, 7, 0.3);
@@ -502,28 +502,36 @@ body {
 
 /* Export Button */
 .export-button {
-    background: #28a745;
-    color: white;
-    border: none;
-    padding: 0.6rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 1rem;
+    display: none; /* replaced by icon-button in selection block */
 }
 
 .export-button:hover {
-    background: #218838;
+    background: inherit;
 }
 
 .export-button:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
+    opacity: 0.5;
 }
+
+/* Small icon button for export inside selection block */
+.icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    background: #2a2a2a;
+    color: #e6f0ff;
+    cursor: pointer;
+}
+.icon-button:hover {
+    background: #334b6d;
+    border-color: #4a9eff;
+}
+.icon-button svg { display: block; }
 
 /* Export Modal */
 .export-modal {

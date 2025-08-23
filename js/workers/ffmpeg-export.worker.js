@@ -3,6 +3,7 @@ import { FFmpeg } from '../../libs/ffmpeg/esm/classes.js';
 let isProcessing = false;
 let ffmpegInstance = null;
 let currentExportId = null;
+let currentTargetDurationSec = 0;
 
 async function getFFmpeg() {
   if (ffmpegInstance && ffmpegInstance.loaded) return ffmpegInstance;
@@ -10,6 +11,26 @@ async function getFFmpeg() {
   ffmpeg.on('log', ({ message }) => {
     if (currentExportId && /error|fail|pass|frame|fps|time|speed/i.test(message)) {
       self.postMessage({ type: 'status', id: currentExportId, message });
+    }
+    // Heuristic progress from log time= when core ratio is not emitted
+    if (currentExportId && currentTargetDurationSec > 0) {
+      const m = /time=\s*([0-9:.]+)/.exec(message);
+      if (m) {
+        const t = m[1];
+        const parts = t.split(':').map(Number);
+        let secs = 0;
+        if (parts.length === 3) {
+          secs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        } else if (parts.length === 2) {
+          secs = parts[0] * 60 + parts[1];
+        } else if (parts.length === 1) {
+          secs = parts[0];
+        }
+        if (isFinite(secs) && secs >= 0) {
+          const pct = Math.max(0, Math.min(99, Math.floor((secs / currentTargetDurationSec) * 100)));
+          self.postMessage({ type: 'progress', id: currentExportId, progress: pct, message: 'Encoding...' });
+        }
+      }
     }
   });
   ffmpeg.on('progress', ({ ratio }) => {
@@ -44,7 +65,7 @@ function buildFilterGraph(ops) {
   return filters.join(',');
 }
 
-async function processWithFFmpeg({ id, file, operations, preset }) {
+async function processWithFFmpeg({ id, file, operations, preset, durationSec }) {
   isProcessing = true;
   currentExportId = id;
   self.postMessage({ type: 'status', id, message: 'Loading FFmpeg core...' });
@@ -58,6 +79,14 @@ async function processWithFFmpeg({ id, file, operations, preset }) {
   const args = ['-hide_banner', '-loglevel', 'info', '-nostdin', '-y'];
   const hasCut = operations.cut && typeof operations.cut.startSec === 'number' && typeof operations.cut.endSec === 'number';
   const hasCrop = !!(operations.crop && operations.crop.mapped);
+  // Set target duration for progress reporting
+  if (hasCut) {
+    currentTargetDurationSec = Math.max(0, Number(operations.cut.endSec) - Number(operations.cut.startSec));
+  } else if (typeof durationSec === 'number' && isFinite(durationSec)) {
+    currentTargetDurationSec = durationSec;
+  } else {
+    currentTargetDurationSec = 0;
+  }
 
   if (hasCut && !hasCrop) {
     // Fast path: stream copy without re-encoding if only trimming
@@ -104,6 +133,8 @@ async function processWithFFmpeg({ id, file, operations, preset }) {
   const data = await ffmpeg.readFile(outputName);
   const blob = new Blob([data], { type: 'video/mp4' });
   self.postMessage({ type: 'complete', id, blob, size: blob.size });
+  // Ensure final progress reaches 100%
+  self.postMessage({ type: 'progress', id, progress: 100, message: 'Done' });
 }
 
 function mapNormalizedCropToSource(operations) {

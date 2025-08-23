@@ -50,7 +50,6 @@
                 <button id="forward-button" class="skip-button" title="Forward (smart duration)">⏩</button>
                 <button id="seek-end-button" class="seek-button" title="Seek to end (or selection end)">⏭</button>
                 <button id="loop-button" class="loop-button" title="Loop selection or video">⟲</button>
-                <button id="export-button" class="export-button" title="Export video">Export</button>
                 <div class="volume-control">
                     <label id="volume-label" for="volume-slider">Volume</label>
                     <input
@@ -69,6 +68,13 @@
                     <span class="selection-time">In: <span id="selection-start">--:--</span></span>
                     <span class="selection-time">Out: <span id="selection-end">--:--</span></span>
                     <span class="selection-time">Duration: <span id="selection-duration">--:--</span></span>
+                    <button id="export-button" class="icon-button" title="Export selection" aria-label="Export selection">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M12 3v10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M8 7l4-4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </main>
