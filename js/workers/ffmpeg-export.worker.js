@@ -1,6 +1,29 @@
 // FFmpeg.wasm export worker (same-origin, no CDN) - ES Module worker
 import { FFmpeg } from '../../libs/ffmpeg/esm/classes.js';
 let isProcessing = false;
+let ffmpegInstance = null;
+let currentExportId = null;
+
+async function getFFmpeg() {
+  if (ffmpegInstance && ffmpegInstance.loaded) return ffmpegInstance;
+  const ffmpeg = new FFmpeg();
+  ffmpeg.on('log', ({ message }) => {
+    if (currentExportId && /error|fail|pass|frame|fps|time|speed/i.test(message)) {
+      self.postMessage({ type: 'status', id: currentExportId, message });
+    }
+  });
+  ffmpeg.on('progress', ({ ratio }) => {
+    if (currentExportId) self.postMessage({ type: 'progress', id: currentExportId, progress: Math.round((ratio || 0) * 100) });
+  });
+  const base = import.meta.url;
+  await ffmpeg.load({
+    coreURL: new URL('../../libs/ffmpeg/esm/ffmpeg-core.js', base).toString(),
+    wasmURL: new URL('../../libs/ffmpeg/ffmpeg-core.wasm', base).toString(),
+    workerURL: new URL('../../libs/ffmpeg/ffmpeg-core.worker.js', base).toString()
+  });
+  ffmpegInstance = ffmpeg;
+  return ffmpegInstance;
+}
 
 const roundEven = (n) => Math.max(0, Math.floor(n / 2) * 2);
 
@@ -23,63 +46,57 @@ function buildFilterGraph(ops) {
 
 async function processWithFFmpeg({ id, file, operations, preset }) {
   isProcessing = true;
+  currentExportId = id;
   self.postMessage({ type: 'status', id, message: 'Loading FFmpeg core...' });
-  const ffmpeg = new FFmpeg();
-
-  ffmpeg.on('log', ({ message }) => {
-    // Forward high-signal logs as status updates
-    if (/error|fail|pass|frame|fps|time|speed/i.test(message)) {
-      self.postMessage({ type: 'status', id, message });
-    }
-  });
-  ffmpeg.on('progress', ({ ratio }) => {
-    self.postMessage({ type: 'progress', id, progress: Math.round((ratio || 0) * 100) });
-  });
-
-  // Load with local core URLs
-  const base = import.meta.url; // URL of this worker module
-  await ffmpeg.load({
-    // Point to our ESM shim which wraps the local UMD core in a module-friendly default export
-    coreURL: new URL('../../libs/ffmpeg/esm/ffmpeg-core.js', base).toString(),
-    // The shim + worker glue passes these through to Emscripten via mainScriptUrlOrBlob
-    wasmURL: new URL('../../libs/ffmpeg/ffmpeg-core.wasm', base).toString(),
-    workerURL: new URL('../../libs/ffmpeg/ffmpeg-core.worker.js', base).toString()
-  });
+  const ffmpeg = await getFFmpeg();
 
   self.postMessage({ type: 'status', id, message: 'Preparing input...' });
   const inputName = 'input.mp4';
   const outputName = 'output.mp4';
   await ffmpeg.writeFile(inputName, new Uint8Array(await file.arrayBuffer()));
 
-  const args = ['-hide_banner', '-loglevel', 'info', '-nostdin', '-y', '-i', inputName];
+  const args = ['-hide_banner', '-loglevel', 'info', '-nostdin', '-y'];
+  const hasCut = operations.cut && typeof operations.cut.startSec === 'number' && typeof operations.cut.endSec === 'number';
+  const hasCrop = !!(operations.crop && operations.crop.mapped);
 
-  if (operations.cut && typeof operations.cut.startSec === 'number' && typeof operations.cut.endSec === 'number') {
-    args.push('-ss', String(operations.cut.startSec));
-    args.push('-to', String(operations.cut.endSec));
+  if (hasCut && !hasCrop) {
+    // Fast path: stream copy without re-encoding if only trimming
+    const start = Number(operations.cut.startSec);
+    const dur = Math.max(0, Number(operations.cut.endSec) - start);
+    args.push('-ss', String(start), '-i', inputName, '-t', String(dur));
+    args.push('-c', 'copy', '-map', '0:v:0', '-map', '0:a?');
+    args.push('-fflags', '+genpts', '-avoid_negative_ts', 'make_zero');
+    args.push('-movflags', '+faststart');
+    args.push(outputName);
+  } else {
+    // Re-encode: crop and/or full encode
+    args.push('-i', inputName);
+    if (hasCut) {
+      const start = Number(operations.cut.startSec);
+      const dur = Math.max(0, Number(operations.cut.endSec) - start);
+      args.push('-ss', String(start), '-t', String(dur));
+    }
+    const vf = buildFilterGraph({ crop: operations.crop && operations.crop.mapped });
+    if (vf) args.push('-vf', vf);
+
+    const videoPreset = (preset?.video?.preset) || 'medium';
+    const videoCrf = String(preset?.video?.crf ?? 21);
+    const audioBR = String(preset?.audio?.bitrate ?? '192k');
+
+    args.push(
+      '-c:v', 'libx264',
+      '-preset', videoPreset,
+      '-crf', videoCrf,
+      '-threads', '0',
+      '-vsync', '2',
+      '-movflags', '+faststart',
+      '-map', '0:v:0',
+      '-map', '0:a?'
+    );
+    // Copy audio for speed; cropping doesn't affect audio
+    args.push('-c:a', 'copy');
+    args.push(outputName);
   }
-
-  const vf = buildFilterGraph({ crop: operations.crop && operations.crop.mapped });
-  if (vf) {
-    args.push('-vf', vf);
-  }
-
-  const videoPreset = (preset?.video?.preset) || 'medium';
-  const videoCrf = String(preset?.video?.crf ?? 21);
-  const audioBR = String(preset?.audio?.bitrate ?? '192k');
-
-  args.push(
-    '-c:v', 'libx264',
-    '-preset', videoPreset,
-    '-crf', videoCrf,
-    '-vsync', '2',
-    '-movflags', '+faststart',
-    '-map', '0:v:0',
-    '-map', '0:a?',
-    '-c:a', 'aac',
-    '-b:a', audioBR,
-    '-af', 'aresample=async=1:first_pts=0',
-    outputName
-  );
 
   self.postMessage({ type: 'status', id, message: 'Encoding with FFmpeg...' });
   await ffmpeg.exec(args);
