@@ -2,6 +2,7 @@ import { appState } from './state.js';
 import { VideoPlayer } from './video-player.js';
 import { FrameRenderer } from './frame-renderer.js';
 import { TimelineFrames } from './timeline-frames.js';
+import { exportUI } from './export-ui.js';
 import { isVideoFile, formatTime } from './utils.js';
 
 class App {
@@ -50,7 +51,8 @@ class App {
             selectionInfo: document.getElementById('selection-info'),
             selectionStart: document.getElementById('selection-start'),
             selectionEnd: document.getElementById('selection-end'),
-            selectionDuration: document.getElementById('selection-duration')
+            selectionDuration: document.getElementById('selection-duration'),
+            exportButton: document.getElementById('export-button')
         };
     }
 
@@ -249,6 +251,13 @@ class App {
             } else {
                 this.elements.loopButton.classList.remove('active');
                 this.elements.loopButton.title = 'Loop disabled - click to enable';
+            }
+        });
+
+        appState.subscribe('file', (file) => {
+            if (this.elements.exportButton) {
+                this.elements.exportButton.disabled = !file;
+                this.elements.exportButton.title = file ? 'Export video' : 'Load a video to export';
             }
         });
     }

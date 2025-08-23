@@ -472,3 +472,318 @@ body {
         padding: 0.3rem 0.6rem;
     }
 }
+
+/* Export Button */
+.export-button {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 1rem;
+}
+
+.export-button:hover {
+    background: #218838;
+}
+
+.export-button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Export Modal */
+.export-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.export-modal-content {
+    background: #2a2a2a;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.export-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #3a3a3a;
+}
+
+.export-modal-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.export-modal-close {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.export-modal-close:hover {
+    background: #3a3a3a;
+    color: #fff;
+}
+
+.export-modal-body {
+    padding: 1.5rem;
+}
+
+.export-section {
+    margin-bottom: 1.5rem;
+}
+
+.export-section:last-child {
+    margin-bottom: 0;
+}
+
+.export-section h4 {
+    margin: 0 0 0.8rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.export-range-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.preset-options,
+.method-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.preset-option,
+.method-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    cursor: pointer;
+    padding: 0.8rem;
+    border-radius: 6px;
+    border: 1px solid #3a3a3a;
+    transition: all 0.2s;
+}
+
+.preset-option:hover,
+.method-option:hover {
+    background: #333;
+    border-color: #4a4a4a;
+}
+
+.preset-option input,
+.method-option input {
+    margin: 0;
+    margin-top: 0.2rem;
+}
+
+.method-option input:disabled ~ .method-label {
+    opacity: 0.5;
+}
+
+.preset-label,
+.method-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    flex: 1;
+}
+
+.preset-label strong,
+.method-label strong {
+    font-weight: 600;
+    color: #fff;
+}
+
+.preset-label small,
+.method-label small {
+    color: #999;
+    font-size: 0.8rem;
+    line-height: 1.3;
+}
+
+.export-estimate {
+    padding: 0.8rem;
+    background: #333;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.export-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.8rem;
+    padding: 1.5rem;
+    border-top: 1px solid #3a3a3a;
+}
+
+.export-cancel-button,
+.export-start-button {
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.export-cancel-button {
+    background: #6c757d;
+    color: white;
+}
+
+.export-cancel-button:hover {
+    background: #5a6268;
+}
+
+.export-start-button {
+    background: #28a745;
+    color: white;
+}
+
+.export-start-button:hover {
+    background: #218838;
+}
+
+/* Progress Modal */
+.export-progress-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+}
+
+.export-progress-content {
+    background: #2a2a2a;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.export-progress-header {
+    padding: 1.5rem 1.5rem 0;
+}
+
+.export-progress-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.export-progress-body {
+    padding: 1.5rem;
+}
+
+.progress-status {
+    text-align: center;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.progress-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #3a3a3a;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #28a745;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    min-width: 40px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #fff;
+    font-weight: 600;
+}
+
+.progress-details {
+    font-size: 0.8rem;
+    color: #999;
+}
+
+.progress-time {
+    display: flex;
+    justify-content: space-between;
+}
+
+.export-progress-footer {
+    padding: 0 1.5rem 1.5rem;
+    text-align: center;
+}
+
+#export-cancel-progress {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+#export-cancel-progress:hover {
+    background: #c82333;
+}
