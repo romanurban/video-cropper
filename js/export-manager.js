@@ -17,7 +17,7 @@ export class ExportManager {
     
     async initializeWorkers() {
         if (!this.ffmpegWorker) {
-            this.ffmpegWorker = new Worker('./js/workers/ffmpeg-export.worker.js');
+            this.ffmpegWorker = new Worker('./js/workers/ffmpeg-export.worker.js', { type: 'module' });
             this.setupWorkerListeners(this.ffmpegWorker, 'ffmpeg');
         }
         
@@ -134,10 +134,18 @@ export class ExportManager {
                 endSec: state.selectionEndSec
             };
         }
-        
-        // TODO: Add crop operation when crop functionality is implemented
-        // For now, we'll add it as a placeholder for future crop UI
-        // operations.crop = { x: 0, y: 0, w: videoWidth, h: videoHeight };
+
+        // Add crop operation if cropRect exists
+        if (state.cropRect && state.videoMetadata) {
+            // Defer mapping to worker/ffmpeg; pass normalized rect and source dims
+            operations.crop = {
+                normalized: state.cropRect,
+                source: {
+                    width: state.videoMetadata.width,
+                    height: state.videoMetadata.height
+                }
+            };
+        }
         
         return operations;
     }

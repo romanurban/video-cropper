@@ -73,7 +73,12 @@
             </div>
         </main>
     </div>
-
+    <script>
+        // Register COOP/COEP service worker to enable SharedArrayBuffer for FFmpeg.wasm
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+        }
+    </script>
     <script type="module" src="js/main.js"></script>
 </body>
 </html>

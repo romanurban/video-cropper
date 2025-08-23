@@ -14,7 +14,9 @@ class AppState {
             error: null,
             selectionStartSec: null,
             selectionEndSec: null,
-            isLooping: false
+            isLooping: false,
+            // Normalized crop rect relative to displayed video content (0..1)
+            cropRect: null
         };
     }
 
@@ -135,6 +137,28 @@ class AppState {
         this.setState({ isLooping: Boolean(isLooping) });
     }
 
+    // Crop state management
+    setCropRect(rect) {
+        // Expect { x, y, w, h } in 0..1 range or null
+        if (rect === null) {
+            this.setState({ cropRect: null });
+            this.emit('cropRect', null);
+            return;
+        }
+        const clamped = {
+            x: Math.min(Math.max(rect.x, 0), 1),
+            y: Math.min(Math.max(rect.y, 0), 1),
+            w: Math.min(Math.max(rect.w, 0), 1),
+            h: Math.min(Math.max(rect.h, 0), 1)
+        };
+        this.setState({ cropRect: clamped });
+        this.emit('cropRect', clamped);
+    }
+
+    clearCropRect() {
+        this.setCropRect(null);
+    }
+
     reset() {
         this.setState({
             file: null,
@@ -149,7 +173,8 @@ class AppState {
             error: null,
             selectionStartSec: null,
             selectionEndSec: null,
-            isLooping: false
+            isLooping: false,
+            cropRect: null
         });
     }
 }

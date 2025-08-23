@@ -138,3 +138,26 @@ export function setupCanvasForDPR(canvas, width, height) {
     
     return ctx;
 }
+
+// Map a normalized crop rect (0..1 relative to displayed video content)
+// to source pixel coordinates, enforcing even dimensions (and even x/y).
+export function mapNormalizedCropToSource(cropRect, videoWidth, videoHeight) {
+    if (!cropRect) return null;
+    const roundEven = (n) => Math.max(0, Math.floor(n / 2) * 2);
+    let sx = Math.round(cropRect.x * videoWidth);
+    let sy = Math.round(cropRect.y * videoHeight);
+    let sw = Math.round(cropRect.w * videoWidth);
+    let sh = Math.round(cropRect.h * videoHeight);
+    // Enforce even for YUV 4:2:0
+    sx = roundEven(sx);
+    sy = roundEven(sy);
+    sw = roundEven(sw);
+    sh = roundEven(sh);
+    // Clamp to bounds
+    if (sx + sw > videoWidth) sw = roundEven(videoWidth - sx);
+    if (sy + sh > videoHeight) sh = roundEven(videoHeight - sy);
+    // Ensure minimum size
+    sw = Math.max(2, sw);
+    sh = Math.max(2, sh);
+    return { x: sx, y: sy, w: sw, h: sh };
+}

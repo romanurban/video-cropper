@@ -4,12 +4,14 @@ import { FrameRenderer } from './frame-renderer.js';
 import { TimelineFrames } from './timeline-frames.js';
 import { exportUI } from './export-ui.js';
 import { isVideoFile, formatTime } from './utils.js';
+import { CropOverlay } from './crop-overlay.js';
 
 class App {
     constructor() {
         this.videoPlayer = null;
         this.frameRenderer = null;
         this.timelineFrames = null;
+        this.cropOverlay = null;
         this.elements = {};
         
         this.init();
@@ -65,6 +67,8 @@ class App {
             this.elements.videoElement,
             this.elements.canvasElement
         );
+        // Initialize crop overlay above the canvas
+        this.cropOverlay = new CropOverlay(this.elements.canvasElement);
     }
 
 
