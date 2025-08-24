@@ -14,8 +14,17 @@ export class ExportManager {
         
         this.maxFFmpegFileSize = 2 * 1024 * 1024 * 1024; // 2GB limit for FFmpeg.wasm
     }
+
+    ensureCrossOriginIsolated() {
+        // SharedArrayBuffer requires cross-origin isolation (COOP/COEP)
+        if (!self.crossOriginIsolated) {
+            throw new Error('SharedArrayBuffer is unavailable. Please refresh the page to enable export (service worker will set COOP/COEP).');
+        }
+    }
     
     async initializeWorkers() {
+        // Guard: avoid cryptic SAB errors in workers
+        this.ensureCrossOriginIsolated();
         if (!this.ffmpegWorker) {
             this.ffmpegWorker = new Worker('./js/workers/ffmpeg-export.worker.js', { type: 'module' });
             this.setupWorkerListeners(this.ffmpegWorker, 'ffmpeg');
