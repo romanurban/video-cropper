@@ -120,12 +120,16 @@
     <script>
         // Register COOP/COEP service worker to enable SharedArrayBuffer for FFmpeg.wasm
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(() => {});
-            // If the page isn't cross-origin isolated yet, reload once SW is ready
+            // Use a relative path so it works on GitHub Pages (project subpath)
+            navigator.serviceWorker.register('sw.js', { scope: './' })
+                .catch((err) => { console.warn('SW register failed', err); });
+            // If the page isn't cross-origin isolated yet, reload once SW is ready (only once)
             if (!window.crossOriginIsolated) {
                 navigator.serviceWorker.ready.then(() => {
-                    // After SW is active and controlling, reload so COOP/COEP headers apply to the document
-                    window.location.reload();
+                    if (!sessionStorage.getItem('coi-reloaded')) {
+                        sessionStorage.setItem('coi-reloaded', '1');
+                        window.location.reload();
+                    }
                 }).catch(() => {});
             }
         }
