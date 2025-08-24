@@ -363,11 +363,11 @@ export class ExportUI {
         const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
         const filename = `${nameWithoutExt}_exported_${timestamp}.mp4`;
         
-        // Download the file
+        // Download the file (silent; no popup)
         exportManager.downloadBlob(blob, filename);
         
-        // Show success message with note about current limitation
-        this.showSuccessMessage(exportManager.getFileSizeString(size), true);
+        // Optionally, we could surface a subtle inline status instead of alert.
+        // Intentionally no popup alert on success.
     }
     
     handleExportError(error) {
