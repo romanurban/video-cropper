@@ -88,8 +88,12 @@ async function processWithFFmpeg({ id, file, operations, preset, durationSec }) 
     currentTargetDurationSec = 0;
   }
 
-  if (hasCut && !hasCrop) {
-    // Fast path: stream copy without re-encoding if only trimming
+  const videoPreset = (preset?.video?.preset) || 'medium';
+  const videoCrf = String(preset?.video?.crf ?? 21);
+  const audioBR = String(preset?.audio?.bitrate ?? '192k');
+
+  if (hasCut && !hasCrop && videoPreset === 'copy') {
+    // Fast path: stream copy without re-encoding if explicitly requested
     const start = Number(operations.cut.startSec);
     const dur = Math.max(0, Number(operations.cut.endSec) - start);
     args.push('-ss', String(start), '-i', inputName, '-t', String(dur));
@@ -108,10 +112,6 @@ async function processWithFFmpeg({ id, file, operations, preset, durationSec }) 
     const vf = buildFilterGraph({ crop: operations.crop && operations.crop.mapped });
     if (vf) args.push('-vf', vf);
 
-    const videoPreset = (preset?.video?.preset) || 'medium';
-    const videoCrf = String(preset?.video?.crf ?? 21);
-    const audioBR = String(preset?.audio?.bitrate ?? '192k');
-
     args.push(
       '-c:v', 'libx264',
       '-preset', videoPreset,
@@ -122,8 +122,8 @@ async function processWithFFmpeg({ id, file, operations, preset, durationSec }) 
       '-map', '0:v:0',
       '-map', '0:a?'
     );
-    // Copy audio for speed; cropping doesn't affect audio
-    args.push('-c:a', 'copy');
+    // Encode audio per preset for consistent quality
+    args.push('-c:a', 'aac', '-b:a', audioBR, '-ac', '2');
     args.push(outputName);
   }
 

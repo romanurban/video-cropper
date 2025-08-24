@@ -47,7 +47,7 @@ export class ExportUI {
                         <h4>Quality Preset</h4>
                         <div class="preset-options">
                             <label class="preset-option">
-                                <input type="radio" name="quality-preset" value="high" checked>
+                                <input type="radio" name="quality-preset" value="high">
                                 <span class="preset-label">
                                     <strong>High Quality</strong>
                                     <small>CRF 18, Slow preset - Best quality, larger file</small>
@@ -61,7 +61,7 @@ export class ExportUI {
                                 </span>
                             </label>
                             <label class="preset-option">
-                                <input type="radio" name="quality-preset" value="fast">
+                                <input type="radio" name="quality-preset" value="fast" checked>
                                 <span class="preset-label">
                                     <strong>Fast Export</strong>
                                     <small>CRF 23, Fast preset - Quick export, smaller file</small>
