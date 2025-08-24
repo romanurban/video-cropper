@@ -216,7 +216,15 @@ class App {
         });
 
         appState.subscribe('isPlaying', (isPlaying) => {
-            this.elements.playPauseButton.textContent = isPlaying ? 'Pause' : 'Play';
+            if (isPlaying) {
+                this.elements.playPauseButton.classList.add('playing');
+                this.elements.playPauseButton.title = 'Pause';
+                this.elements.playPauseButton.setAttribute('aria-label', 'Pause');
+            } else {
+                this.elements.playPauseButton.classList.remove('playing');
+                this.elements.playPauseButton.title = 'Play';
+                this.elements.playPauseButton.setAttribute('aria-label', 'Play');
+            }
         });
 
         appState.subscribe('volume', (volume) => {

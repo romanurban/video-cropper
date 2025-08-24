@@ -43,13 +43,51 @@
             </div>
 
             <div class="controls-panel" id="controls-panel" style="display: none;">
-                <button id="seek-beginning-button" class="seek-button" title="Seek to beginning (or selection start)">⏮</button>
-                <button id="rewind-button" class="skip-button" title="Rewind (smart duration)">⏪</button>
-                <button id="play-pause-button">Play</button>
-                <button id="stop-button" class="stop-button" title="Stop and reset to beginning">⏹</button>
-                <button id="forward-button" class="skip-button" title="Forward (smart duration)">⏩</button>
-                <button id="seek-end-button" class="seek-button" title="Seek to end (or selection end)">⏭</button>
-                <button id="loop-button" class="loop-button" title="Loop selection or video">⟲</button>
+                <button id="seek-beginning-button" class="seek-button" title="Seek to beginning (or selection start)" aria-label="Seek to beginning">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 6h2v12H4z" fill="currentColor"/>
+                        <path d="M20 18l-10-6 10-6v12z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button id="rewind-button" class="skip-button" title="Rewind (smart duration)" aria-label="Rewind">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M11 18l-8-6 8-6v12z" fill="currentColor"/>
+                        <path d="M21 18l-8-6 8-6v12z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button id="play-pause-button" aria-label="Play/Pause">
+                    <svg class="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 5v14l11-7L8 5z" fill="currentColor"/>
+                    </svg>
+                    <svg class="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 4h4v16H6V4zM14 4h4v16h-4V4z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button id="stop-button" class="stop-button" title="Stop and reset to beginning" aria-label="Stop">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="6" y="6" width="12" height="12" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button id="forward-button" class="skip-button" title="Forward (smart duration)" aria-label="Forward">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M13 6l8 6-8 6V6z" fill="currentColor"/>
+                        <path d="M3 6l8 6-8 6V6z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button id="seek-end-button" class="seek-button" title="Seek to end (or selection end)" aria-label="Seek to end">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 6l10 6-10 6V6z" fill="currentColor"/>
+                        <path d="M18 6h2v12h-2z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button id="loop-button" class="loop-button" title="Loop selection or video" aria-label="Toggle loop">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 1l4 4-4 4" fill="currentColor"/>
+                        <path d="M3 12a6 6 0 0 1 6-6h12v2H9a4 4 0 0 0-4 4v0" fill="currentColor"/>
+                        <path d="M7 23l-4-4 4-4" fill="currentColor"/>
+                        <path d="M21 12a6 6 0 0 1-6 6H3v-2h12a4 4 0 0 0 4-4v0" fill="currentColor"/>
+                    </svg>
+                </button>
                 <div class="volume-control">
                     <label id="volume-label" for="volume-slider">Volume</label>
                     <input
