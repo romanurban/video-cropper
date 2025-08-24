@@ -30,6 +30,7 @@ class App {
         this.elements = {
             dropZone: document.getElementById('drop-zone'),
             openButton: document.getElementById('open-button'),
+            loadSampleLink: document.getElementById('load-sample-link'),
             fileInput: document.getElementById('file-input'),
             videoContainer: document.getElementById('video-container'),
             videoElement: document.getElementById('video-element'),
@@ -88,6 +89,14 @@ class App {
             e.stopPropagation();
             this.elements.fileInput.click();
         });
+
+        if (this.elements.loadSampleLink) {
+            this.elements.loadSampleLink.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                await this.loadSampleFile();
+            });
+        }
 
         this.elements.fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -307,6 +316,24 @@ class App {
         } catch (error) {
             console.error('Error handling file:', error);
             this.showError(`Failed to load video: ${error.message}`);
+        }
+    }
+
+    async loadSampleFile() {
+        const samplePath = 'samples/BigBuckBunny_sample.mp4';
+        try {
+            const response = await fetch(samplePath);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch sample (${response.status})`);
+            }
+            const blob = await response.blob();
+            const type = blob.type || 'video/mp4';
+            // Create a File so downstream filename/metadata flows work as with user files
+            const file = new File([blob], 'BigBuckBunny_sample.mp4', { type });
+            await this.handleFileSelect(file);
+        } catch (err) {
+            console.error('Error loading sample file:', err);
+            this.showError('Unable to load sample video. Please try again.');
         }
     }
 
