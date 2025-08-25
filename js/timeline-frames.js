@@ -529,15 +529,20 @@ export class TimelineFrames {
         
         // Do not clear selection when clicking outside it; allow seeking while keeping selection
         
+        // If a selection already exists, do not start a new one; just seek
+        const hasSelection = this.selectionStartSec !== null && this.selectionEndSec !== null;
+        if (hasSelection) {
+            this.handleSeek(clickTime);
+            return;
+        }
+
         // Start new selection or seek
         this.isDragging = true;
         this.selectionAnchor = clickTime;
-        
         this.frameStrip.setPointerCapture(event.pointerId);
         this.frameStrip.addEventListener('pointermove', this.handlePointerMove);
         this.frameStrip.addEventListener('pointerup', this.handlePointerUp);
-        
-        // For now, just seek to the position
+        // Provide immediate seek feedback
         this.handleSeek(clickTime);
     }
 
