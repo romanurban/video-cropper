@@ -871,8 +871,12 @@ export class TimelineFrames {
             if (!merged.length) { merged.push({ ...r }); continue; }
             const last = merged[merged.length - 1];
             if (r.start <= last.end + 1e-6) {
+                // Merge contiguous/overlapping ranges; expansion state collapses by default
                 last.end = Math.max(last.end, r.end);
-                last.expanded = Boolean(last.expanded || r.expanded);
+                // Only keep expanded=true if ALL merged parts were expanded.
+                // This ensures that adding a new (collapsed) deletion adjacent to an expanded one
+                // results in a collapsed joined region, per UX expectation.
+                last.expanded = Boolean(last.expanded && r.expanded);
             } else {
                 merged.push({ ...r });
             }

@@ -296,37 +296,24 @@ body {
 }
 
 /* High-visibility marker: circular badge + pointer stem */
+/* Triangle marker for collapsed deleted region */
 .timeline-deleted-marker {
     position: absolute;
-    top: 4px; /* inside ribbon to avoid parent overflow clipping */
+    top: 6px; /* inside ribbon */
     left: 0;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #ff3b30; /* vivid red */
-    border: 2px solid #ffffff; /* white ring for contrast */
-    box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid #ff3b30; /* triangle pointing down */
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
     cursor: pointer;
     pointer-events: auto;
     transform: translateX(-50%);
 }
 
-.timeline-deleted-marker::after {
-    content: '';
-    position: absolute;
-    top: 16px; /* attach to circle bottom */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 8px solid #ff3b30; /* pointer */
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
-}
-
 .timeline-deleted-marker:hover {
-    background: #ff5a52;
+    border-top-color: #ff5a52;
 }
 
 .timeline-playhead-frames {
