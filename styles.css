@@ -10,12 +10,16 @@ body {
     color: #ffffff;
     height: 100vh;
     overflow: hidden;
+    /* Ensure bottom UI (iOS/Android bars) doesn't overlap */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .app-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100vh;    /* fallback */
+    height: 100svh;   /* small viewport on mobile */
+    height: 100dvh;   /* dynamic viewport for modern browsers */
 }
 
 .app-header {
@@ -428,6 +432,8 @@ body {
 .controls-panel {
     background: #2a2a2a;
     padding: 1rem;
+    /* Add breathing room at bottom (supports iOS safe area) */
+    padding-bottom: calc(2.25rem + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #3a3a3a;
     display: flex;
     align-items: center;
@@ -619,6 +625,7 @@ body {
         flex-wrap: wrap;
         justify-content: center;
         gap: 0.5rem;
+        padding-bottom: calc(2.75rem + env(safe-area-inset-bottom, 0px));
     }
     
     .selection-info {
