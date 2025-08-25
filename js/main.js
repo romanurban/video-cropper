@@ -145,12 +145,11 @@ class App {
             if (isPlaying) {
                 this.videoPlayer.pause();
             } else {
-                // If we're at or inside a deleted fragment, jump to next valid time first
-                if (this.timelineFrames && typeof this.timelineFrames.isTimeInDeletedRange === 'function' && typeof this.timelineFrames.getNextNonDeletedTime === 'function') {
+                // If starting inside a deleted fragment, allow play-through instead of skipping
+                if (this.timelineFrames && typeof this.timelineFrames.isTimeInDeletedRange === 'function') {
                     const now = this.videoPlayer.getCurrentTime();
                     if (this.timelineFrames.isTimeInDeletedRange(now)) {
-                        const target = this.timelineFrames.getNextNonDeletedTime(now);
-                        this.videoPlayer.seekTo(target);
+                        this.timelineFrames.playThroughDeleted = true;
                     }
                 }
                 this.videoPlayer.play();

@@ -31,6 +31,7 @@ export class TimelineFrames {
         this.isPlayingVideo = false;
         this.lastClickTime = 0;
         this.clickDebounceMs = 50; // Prevent rapid clicks from interfering
+        this.playThroughDeleted = false; // allow seamless play inside deleted when user starts there
         
         this.handleResize = debounce(this.updateLayout.bind(this), 200);
         this.handlePointerMove = this.handlePointerMove.bind(this);
@@ -392,14 +393,34 @@ export class TimelineFrames {
         return null;
     }
 
+    getDeletedResizeHandle(x) {
+        if (!this.deletedRanges || !this.deletedRanges.length || !this.duration) return null;
+        const expanded = this.deletedRanges.map((r, i) => ({ ...r, index: i })).filter(r => r.expanded);
+        if (!expanded.length) return null;
+        this.frameStrip.offsetWidth;
+        const rect = this.frameStrip.getBoundingClientRect();
+        const rectWidth = Math.round(rect.width);
+        if (rectWidth <= 0) return null;
+        for (const r of expanded) {
+            const startPct = this.getCollapsedPercentForTime(r.start) / 100;
+            const endPct = this.getCollapsedPercentForTime(r.end) / 100;
+            const startX = Math.round(startPct * rectWidth);
+            const endX = Math.round(endPct * rectWidth);
+            if (Math.abs(x - startX) <= this.resizeHandleWidth / 2) return { index: r.index, edge: 'start' };
+            if (Math.abs(x - endX) <= this.resizeHandleWidth / 2) return { index: r.index, edge: 'end' };
+        }
+        return null;
+    }
+
     handleMouseMove(event) {
         if (this.isDragging || this.isSelecting || this.isResizing) return;
         
         const rect = this.frameStrip.getBoundingClientRect();
         const x = Math.round(event.clientX - rect.left);
         const resizeHandle = this.getResizeHandle(x);
+        const deletedHandle = this.getDeletedResizeHandle(x);
         
-        if (resizeHandle) {
+        if (resizeHandle || deletedHandle) {
             this.frameStrip.setAttribute('data-cursor', 'col-resize');
         } else if (this.selectionStartSec !== null && this.selectionEndSec !== null) {
         const percentage = clamp(x / rect.width, 0, 1);
@@ -465,13 +486,28 @@ export class TimelineFrames {
         this.currentTime = clickTime;
         this.updatePlayheadVisual();
         
-        // Check if clicking on a resize handle
+        // Check if clicking on a selection resize handle
         const resizeHandle = this.getResizeHandle(x);
         if (resizeHandle) {
             this.isResizing = true;
+            this.resizingDeleted = false;
             this.resizeHandle = resizeHandle;
             this.frameStrip.setAttribute('data-cursor', 'col-resize');
             
+            this.frameStrip.setPointerCapture(event.pointerId);
+            this.frameStrip.addEventListener('pointermove', this.handlePointerMove);
+            this.frameStrip.addEventListener('pointerup', this.handlePointerUp);
+            return;
+        }
+
+        // Check if clicking on an expanded deleted resize handle
+        const delHandle = this.getDeletedResizeHandle(x);
+        if (delHandle) {
+            this.isResizing = true;
+            this.resizingDeleted = true;
+            this.resizeDeletedIndex = delHandle.index;
+            this.resizeHandle = delHandle.edge;
+            this.frameStrip.setAttribute('data-cursor', 'col-resize');
             this.frameStrip.setPointerCapture(event.pointerId);
             this.frameStrip.addEventListener('pointermove', this.handlePointerMove);
             this.frameStrip.addEventListener('pointerup', this.handlePointerUp);
@@ -524,17 +560,31 @@ export class TimelineFrames {
         const currentTime = Math.round((this.getTimeForCollapsedPercent(percentage * 100)) * 1000) / 1000;
         
         if (this.isResizing) {
-            // Handle selection resize
-            let newStartSec = this.selectionStartSec;
-            let newEndSec = this.selectionEndSec;
-            
-            if (this.resizeHandle === 'start') {
-                newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.1);
-            } else if (this.resizeHandle === 'end') {
-                newEndSec = clamp(currentTime, this.selectionStartSec + 0.1, this.duration);
+            if (!this.resizingDeleted) {
+                // Handle selection resize
+                let newStartSec = this.selectionStartSec;
+                let newEndSec = this.selectionEndSec;
+                if (this.resizeHandle === 'start') {
+                    newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.1);
+                } else if (this.resizeHandle === 'end') {
+                    newEndSec = clamp(currentTime, this.selectionStartSec + 0.1, this.duration);
+                }
+                this.updateSelectionPreview(newStartSec, newEndSec);
+            } else {
+                // Live resize expanded deleted
+                const idx = this.resizeDeletedIndex;
+                if (idx >= 0 && idx < this.deletedRanges.length) {
+                    const r = this.deletedRanges[idx];
+                    const minDur = 0.05;
+                    if (this.resizeHandle === 'start') {
+                        r.start = clamp(currentTime, 0, r.end - minDur);
+                    } else if (this.resizeHandle === 'end') {
+                        r.end = clamp(currentTime, r.start + minDur, this.duration);
+                    }
+                    this.updateDeletedOverlays();
+                    this.renderDeletedMarkers();
+                }
             }
-            
-            this.updateSelectionPreview(newStartSec, newEndSec);
         } else {
             // Handle new selection creation
             const anchorPercentage = this.selectionAnchor / this.duration;
@@ -584,23 +634,40 @@ export class TimelineFrames {
             if (rectWidth <= 0) return;
             
             const percentage = clamp(x / rectWidth, 0, 1);
-            const currentTime = Math.round((percentage * this.duration) * 1000) / 1000; // Round to millisecond precision
+            const currentTime = Math.round((this.getTimeForCollapsedPercent(percentage * 100)) * 1000) / 1000;
             
-            let newStartSec = this.selectionStartSec;
-            let newEndSec = this.selectionEndSec;
-            
-            if (this.resizeHandle === 'start') {
-                newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.1);
-            } else if (this.resizeHandle === 'end') {
-                newEndSec = clamp(currentTime, this.selectionStartSec + 0.1, this.duration);
+            if (!this.resizingDeleted) {
+                let newStartSec = this.selectionStartSec;
+                let newEndSec = this.selectionEndSec;
+                if (this.resizeHandle === 'start') {
+                    newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.1);
+                } else if (this.resizeHandle === 'end') {
+                    newEndSec = clamp(currentTime, this.selectionStartSec + 0.1, this.duration);
+                }
+                appState.setSelection(newStartSec, newEndSec);
+                // Seek to the beginning of the resized selection
+                this.handleSeek(newStartSec);
+            } else {
+                // Finalize expanded deleted resize
+                const idx = this.resizeDeletedIndex;
+                if (idx >= 0 && idx < this.deletedRanges.length) {
+                    const r = this.deletedRanges[idx];
+                    const minDur = 0.05;
+                    if (this.resizeHandle === 'start') {
+                        r.start = clamp(currentTime, 0, r.end - minDur);
+                    } else if (this.resizeHandle === 'end') {
+                        r.end = clamp(currentTime, r.start + minDur, this.duration);
+                    }
+                    this.normalizeDeletedRanges();
+                    this.updateDeletedOverlays();
+                    this.renderDeletedMarkers();
+                    this.generateThumbnails();
+                }
             }
             
-            appState.setSelection(newStartSec, newEndSec);
-            
-            // Seek to the beginning of the resized selection
-            this.handleSeek(newStartSec);
-            
             this.isResizing = false;
+            this.resizingDeleted = false;
+            this.resizeDeletedIndex = -1;
             this.resizeHandle = null;
             this.frameStrip.removeAttribute('data-cursor');
         } else if (this.isSelecting && this.selectionAnchor !== null) {
@@ -698,13 +765,21 @@ export class TimelineFrames {
                 const threshold = 0.005; // 5ms window
                 for (const r of this.deletedRanges) {
                     if (realCurrentTime >= (r.start - threshold) && realCurrentTime < r.end) {
-                        const target = (typeof this.getNextNonDeletedTime === 'function')
-                            ? this.getNextNonDeletedTime(r.end)
-                            : r.end;
-                        this.videoPlayer.seekTo(target);
-                        this.currentTime = target;
-                        this.updatePlayheadVisual();
+                        if (this.playThroughDeleted) {
+                            // Let it play through; clear flag once we exit this region
+                        } else {
+                            // Skip deleted range when not explicitly playing inside it
+                            const target = (typeof this.getNextNonDeletedTime === 'function')
+                                ? this.getNextNonDeletedTime(r.end)
+                                : r.end;
+                            this.videoPlayer.seekTo(target);
+                            this.currentTime = target;
+                            this.updatePlayheadVisual();
+                        }
                         break;
+                    } else if (this.playThroughDeleted && realCurrentTime >= r.end && realCurrentTime < r.end + 0.05) {
+                        // Just exited a deleted range we were playing through; reset flag
+                        this.playThroughDeleted = false;
                     }
                 }
             }
@@ -840,6 +915,7 @@ export class TimelineFrames {
         this.selectionStartSec = null;
         this.selectionEndSec = null;
         this.deletedRanges = [];
+        this.playThroughDeleted = false;
         this.isSelecting = false;
         this.isResizing = false;
         this.resizeHandle = null;
