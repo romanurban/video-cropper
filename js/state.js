@@ -133,6 +133,36 @@ class AppState {
         this.emit('selection', null);
     }
 
+    deleteSelection() {
+        if (this.state.selectionStartSec === null || this.state.selectionEndSec === null) {
+            return; // No selection to delete
+        }
+
+        const startSec = this.state.selectionStartSec;
+        const endSec = this.state.selectionEndSec;
+        
+        // Store the deleted selection info for potential undo
+        const deletedSelection = {
+            startSec,
+            endSec,
+            duration: endSec - startSec
+        };
+        
+        // Clear the selection immediately for visual feedback
+        this.clearSelection();
+        
+        // Emit deletion event with detailed information
+        this.emit('selectionDeleted', {
+            deletedSelection,
+            message: `Deleted ${(endSec - startSec).toFixed(2)}s selection from ${startSec.toFixed(2)}s to ${endSec.toFixed(2)}s`,
+            action: 'deleted'
+        });
+        
+        // For now, we're just clearing the selection. In a full implementation, 
+        // this would trigger video trimming/editing operations
+        console.info(`Selection deleted: ${startSec.toFixed(2)}s - ${endSec.toFixed(2)}s (duration: ${(endSec - startSec).toFixed(2)}s)`);
+    }
+
     setLooping(isLooping) {
         this.setState({ isLooping: Boolean(isLooping) });
     }

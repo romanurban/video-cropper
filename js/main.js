@@ -55,6 +55,8 @@ class App {
             selectionStart: document.getElementById('selection-start'),
             selectionEnd: document.getElementById('selection-end'),
             selectionDuration: document.getElementById('selection-duration'),
+            restoreSelectionButton: document.getElementById('restore-selection-button'),
+            deleteSelectionButton: document.getElementById('delete-selection-button'),
             exportButton: document.getElementById('export-button')
         };
     }
@@ -143,6 +145,14 @@ class App {
             if (isPlaying) {
                 this.videoPlayer.pause();
             } else {
+                // If we're at or inside a deleted fragment, jump to next valid time first
+                if (this.timelineFrames && typeof this.timelineFrames.isTimeInDeletedRange === 'function' && typeof this.timelineFrames.getNextNonDeletedTime === 'function') {
+                    const now = this.videoPlayer.getCurrentTime();
+                    if (this.timelineFrames.isTimeInDeletedRange(now)) {
+                        const target = this.timelineFrames.getNextNonDeletedTime(now);
+                        this.videoPlayer.seekTo(target);
+                    }
+                }
                 this.videoPlayer.play();
             }
         });
@@ -181,6 +191,28 @@ class App {
                 this.videoPlayer.setVolume(percent / 100);
             });
         }
+
+        if (this.elements.deleteSelectionButton) {
+            this.elements.deleteSelectionButton.addEventListener('click', () => {
+                if (this.hasActiveSelection()) {
+                    appState.deleteSelection();
+                }
+            });
+        }
+
+        if (this.elements.restoreSelectionButton) {
+            this.elements.restoreSelectionButton.addEventListener('click', () => {
+                const selectionStartSec = appState.getState('selectionStartSec');
+                const selectionEndSec = appState.getState('selectionEndSec');
+                if (selectionStartSec !== null && selectionEndSec !== null && this.timelineFrames) {
+                    const changed = this.timelineFrames.restoreDeletedInRange(selectionStartSec, selectionEndSec);
+                    if (changed) {
+                        this.showInfo('Restored deleted fragments in selection');
+                    }
+                    this.updateRestoreButtonState();
+                }
+            });
+        }
     }
 
     setupKeyboardControls() {
@@ -190,8 +222,17 @@ class App {
             } else if (e.key === ' ' && e.shiftKey) {
                 e.preventDefault();
                 this.playFromSelectionStart();
+            } else if ((e.key === 'Delete' || e.key === 'Backspace') && this.hasActiveSelection()) {
+                e.preventDefault();
+                appState.deleteSelection();
             }
         });
+    }
+
+    hasActiveSelection() {
+        const selectionStartSec = appState.getState('selectionStartSec');
+        const selectionEndSec = appState.getState('selectionEndSec');
+        return selectionStartSec !== null && selectionEndSec !== null;
     }
 
     playFromSelectionStart() {
@@ -260,8 +301,10 @@ class App {
                 this.elements.selectionEnd.textContent = formatTime(selection.endSec);
                 this.elements.selectionDuration.textContent = formatTime(selection.endSec - selection.startSec);
                 this.elements.selectionInfo.style.display = 'flex';
+                this.updateRestoreButtonState();
             } else {
                 this.elements.selectionInfo.style.display = 'none';
+                this.updateRestoreButtonState();
             }
         });
 
@@ -279,6 +322,24 @@ class App {
             if (this.elements.exportButton) {
                 this.elements.exportButton.disabled = !file;
                 this.elements.exportButton.title = file ? 'Export video' : 'Load a video to export';
+            }
+        });
+
+        appState.subscribe('selectionDeleted', (data) => {
+            if (data && data.message) {
+                this.showInfo(data.message);
+                // Add visual feedback for deletion
+                if (data.action === 'deleted') {
+                    this.showDeletionFeedback(data.deletedSelection);
+                    // Move playhead to the beginning of the not-deleted part
+                    const end = Math.max(0, Number(data.deletedSelection.endSec) || 0);
+                    const target = (this.timelineFrames && typeof this.timelineFrames.getNextNonDeletedTime === 'function')
+                        ? this.timelineFrames.getNextNonDeletedTime(end)
+                        : end;
+                    this.videoPlayer.pause();
+                    this.videoPlayer.seekTo(target);
+                }
+                this.updateRestoreButtonState();
             }
         });
     }
@@ -356,6 +417,83 @@ class App {
 
     showError(message) {
         alert(`Error: ${message}`);
+    }
+
+    showInfo(message) {
+        console.info(message);
+        // Create a simple toast notification
+        this.showToast(message);
+    }
+
+    showDeletionFeedback(deletedSelection) {
+        // Visual feedback when selection is deleted
+        if (this.elements.selectionInfo && this.elements.selectionInfo.style.display !== 'none') {
+            // Flash effect to show something was deleted
+            this.elements.selectionInfo.style.transition = 'opacity 0.3s ease';
+            this.elements.selectionInfo.style.opacity = '0.3';
+            setTimeout(() => {
+                this.elements.selectionInfo.style.opacity = '1';
+            }, 300);
+        }
+        
+        // Log the deletion details
+        console.info(`Selection deleted: ${deletedSelection.duration.toFixed(2)}s from ${deletedSelection.startSec.toFixed(2)}s to ${deletedSelection.endSec.toFixed(2)}s`);
+    }
+
+    showToast(message) {
+        // Simple toast notification implementation
+        let toast = document.getElementById('toast-notification');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toast-notification';
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 12px 16px;
+                border-radius: 4px;
+                font-size: 14px;
+                z-index: 1000;
+                opacity: 0;
+                transform: translateY(-20px);
+                transition: all 0.3s ease;
+                max-width: 300px;
+                word-wrap: break-word;
+            `;
+            document.body.appendChild(toast);
+        }
+        
+        toast.textContent = message;
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    }
+
+    updateRestoreButtonState() {
+        const btn = this.elements.restoreSelectionButton;
+        if (!btn) return;
+        const start = appState.getState('selectionStartSec');
+        const end = appState.getState('selectionEndSec');
+        if (start === null || end === null || !this.timelineFrames) {
+            btn.disabled = true;
+            btn.title = 'Restore unavailable (no selection)';
+            return;
+        }
+        const hasDeleted = this.timelineFrames.hasDeletedInRange(start, end);
+        btn.disabled = !hasDeleted;
+        btn.title = hasDeleted ? 'Restore deleted fragments in selection' : 'No deleted fragments in selection';
     }
 }
 

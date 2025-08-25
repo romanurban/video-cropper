@@ -9,6 +9,7 @@ export class TimelineFrames {
         this.thumbnailService = new ThumbnailService();
         this.frameStrip = null;
         this.playhead = null;
+        this.deletedMarkersLayer = null;
         this.progressLine = null;
         this.progressTrack = null;
         this.thumbnailsContainer = null;
@@ -23,6 +24,7 @@ export class TimelineFrames {
         this.selectionAnchor = null;
         this.selectionStartSec = null;
         this.selectionEndSec = null;
+        this.deletedRanges = [];
         this.stripWidth = 0;
         this.resizeHandleWidth = 4; // Width of resize handle in pixels
         this.animationFrameId = null;
@@ -37,6 +39,74 @@ export class TimelineFrames {
         this.smoothUpdateLoop = this.smoothUpdateLoop.bind(this);
         
         this.init();
+    }
+
+    hasDeletedInRange(startSec, endSec) {
+        if (!this.deletedRanges || !this.deletedRanges.length) return false;
+        const s = Math.min(startSec, endSec);
+        const e = Math.max(startSec, endSec);
+        return this.deletedRanges.some(r => Math.max(r.start, s) < Math.min(r.end, e));
+    }
+
+    restoreDeletedInRange(startSec, endSec) {
+        if (!this.deletedRanges || !this.deletedRanges.length) return false;
+        const s = Math.min(startSec, endSec);
+        const e = Math.max(startSec, endSec);
+        const next = [];
+        let changed = false;
+        for (const r of this.deletedRanges) {
+            const overlapStart = Math.max(r.start, s);
+            const overlapEnd = Math.min(r.end, e);
+            if (overlapEnd <= overlapStart) {
+                // no overlap
+                next.push(r);
+                continue;
+            }
+            changed = true;
+            // If selection fully covers this range, drop it
+            if (s <= r.start && e >= r.end) {
+                continue;
+            }
+            // Partial overlaps: trim or split
+            if (r.start < s && r.end > e) {
+                // selection in the middle -> split into two ranges
+                next.push({ start: r.start, end: s });
+                next.push({ start: e, end: r.end });
+            } else if (r.start < s && r.end <= e) {
+                // overlap on the right side -> trim end
+                next.push({ start: r.start, end: s });
+            } else if (r.start >= s && r.end > e) {
+                // overlap on the left side -> trim start
+                next.push({ start: e, end: r.end });
+            }
+        }
+        if (changed) {
+            this.deletedRanges = next;
+            this.updateDeletedOverlays();
+        }
+        return changed;
+    }
+
+    isTimeInDeletedRange(timeSec) {
+        if (!this.deletedRanges || !this.deletedRanges.length) return false;
+        return this.deletedRanges.some(r => timeSec >= r.start && timeSec < r.end);
+    }
+
+    getNextNonDeletedTime(timeSec) {
+        if (!this.duration || this.duration <= 0) return 0;
+        let t = Math.max(0, Math.min(this.duration, Number(timeSec) || 0));
+        // If t lands in a deleted range, jump to the end of that range.
+        // Repeat in case of back-to-back deleted ranges.
+        let safety = 0;
+        while (this.isTimeInDeletedRange(t) && safety < 100) {
+            const covering = this.deletedRanges.find(r => t >= r.start && t < r.end);
+            if (!covering) break;
+            t = covering.end;
+            safety++;
+        }
+        // Add a tiny epsilon to avoid being exactly on a boundary
+        const epsilon = 0.001;
+        return Math.min(this.duration, t + epsilon);
     }
 
     init() {
@@ -71,9 +141,14 @@ export class TimelineFrames {
         this.progressLine.className = 'timeline-progress-line';
         this.progressLine.style.width = '0%';
         
+        // Deleted markers overlay (clickable) on top of the main ribbon
+        this.deletedMarkersLayer = document.createElement('div');
+        this.deletedMarkersLayer.className = 'timeline-deleted-markers';
+        
         this.frameStrip.appendChild(this.thumbnailsContainer);
         this.frameStrip.appendChild(this.selectionOverlay);
         this.frameStrip.appendChild(this.playhead);
+        this.frameStrip.appendChild(this.deletedMarkersLayer);
         
         this.progressTrack.appendChild(this.progressLine);
         
@@ -115,6 +190,7 @@ export class TimelineFrames {
             if (metadata) {
                 this.duration = metadata.duration;
                 this.generateThumbnails();
+                this.renderDeletedMarkers();
             }
         });
 
@@ -145,6 +221,21 @@ export class TimelineFrames {
                 this.selectionEndSec = null;
             }
             this.updateSelectionDisplay();
+        });
+
+        // When a selection is deleted, mark that range visually on the ribbon
+        appState.subscribe('selectionDeleted', (data) => {
+            if (data && data.deletedSelection && this.duration > 0) {
+                const { startSec, endSec } = data.deletedSelection;
+                // Clamp to duration and ignore zero-length
+                const start = Math.max(0, Math.min(this.duration, startSec));
+                const end = Math.max(0, Math.min(this.duration, endSec));
+                if (end > start) {
+                    this.addDeletedRange({ start, end });
+                    this.updateDeletedOverlays();
+                    this.renderDeletedMarkers();
+                }
+            }
         });
     }
 
@@ -202,7 +293,7 @@ export class TimelineFrames {
         const thumbnailSpacing = 2;
         const totalSpacing = (count - 1) * thumbnailSpacing;
         const thumbnailWidth = Math.floor((availableWidth - totalSpacing) / count);
-        const maxThumbnailHeight = 86; // Leave space for time labels - 10px margin from 96px container
+        const maxThumbnailHeight = 86; // Leave space for time labels
         let thumbnailHeight = Math.round(thumbnailWidth / aspectRatio);
         
         // For vertical videos, limit height and adjust width accordingly
@@ -307,8 +398,8 @@ export class TimelineFrames {
         if (resizeHandle) {
             this.frameStrip.setAttribute('data-cursor', 'col-resize');
         } else if (this.selectionStartSec !== null && this.selectionEndSec !== null) {
-            const percentage = clamp(x / rect.width, 0, 1);
-            const time = percentage * this.duration;
+        const percentage = clamp(x / rect.width, 0, 1);
+        const time = percentage * this.duration;
             
             // Check if inside selection for move cursor
             if (time >= this.selectionStartSec && time <= this.selectionEndSec) {
@@ -352,7 +443,7 @@ export class TimelineFrames {
         }
         
         const percentage = clamp(x / rectWidth, 0, 1);
-        const clickTime = Math.round((percentage * this.duration) * 1000) / 1000; // Round to millisecond precision
+        const clickTime = Math.round((percentage * this.duration) * 1000) / 1000;
         
         // Debug logging for troubleshooting (uncomment if needed)
         // console.debug('Timeline click:', { x, rectWidth, percentage, clickTime, duration: this.duration });
@@ -417,7 +508,7 @@ export class TimelineFrames {
         if (rectWidth <= 0) return;
         
         const percentage = clamp(x / rectWidth, 0, 1);
-        const currentTime = Math.round((percentage * this.duration) * 1000) / 1000; // Round to millisecond precision
+        const currentTime = Math.round((percentage * this.duration) * 1000) / 1000;
         
         if (this.isResizing) {
             // Handle selection resize
@@ -589,6 +680,21 @@ export class TimelineFrames {
             
             // Ultra-precise selection boundary checking at 60fps
             this.checkSelectionBoundaryUltraPrecise(realCurrentTime);
+            // Skip deleted range seamlessly during playback
+            if (this.deletedRanges && this.deletedRanges.length) {
+                const threshold = 0.005; // 5ms window
+                for (const r of this.deletedRanges) {
+                    if (realCurrentTime >= (r.start - threshold) && realCurrentTime < r.end) {
+                        const target = (typeof this.getNextNonDeletedTime === 'function')
+                            ? this.getNextNonDeletedTime(r.end)
+                            : r.end;
+                        this.videoPlayer.seekTo(target);
+                        this.currentTime = target;
+                        this.updatePlayheadVisual();
+                        break;
+                    }
+                }
+            }
         }
         
         if (this.isPlayingVideo) {
@@ -642,6 +748,7 @@ export class TimelineFrames {
             }
             this.progressLine.style.width = `${progressPercentage}%`;
         }
+        // No collapsed line when using single ribbon
     }
 
     updateSelectionPreview(startSec, endSec) {
@@ -681,6 +788,25 @@ export class TimelineFrames {
             `Selected range from ${formatTime(this.selectionStartSec)} to ${formatTime(this.selectionEndSec)}, duration ${formatTime(duration)}`);
     }
 
+    updateDeletedOverlays() {
+        // Remove existing overlays
+        const old = this.frameStrip.querySelectorAll('.timeline-deleted-overlay');
+        old.forEach(el => el.parentElement && el.parentElement.removeChild(el));
+        if (!this.duration || this.duration <= 0) return;
+        // Render overlays for each deleted range on full timeline scale
+        for (const range of this.deletedRanges) {
+            const startPct = (range.start / this.duration) * 100;
+            const endPct = (range.end / this.duration) * 100;
+            const widthPct = Math.max(0, endPct - startPct);
+            if (widthPct <= 0) continue;
+            const overlay = document.createElement('div');
+            overlay.className = 'timeline-deleted-overlay';
+            overlay.style.left = `${startPct}%`;
+            overlay.style.width = `${widthPct}%`;
+            this.frameStrip.appendChild(overlay);
+        }
+    }
+
     updateLayout() {
         const containerRect = this.container.getBoundingClientRect();
         if (containerRect.width !== this.containerWidth) {
@@ -703,6 +829,7 @@ export class TimelineFrames {
         this.thumbnails = [];
         this.selectionStartSec = null;
         this.selectionEndSec = null;
+        this.deletedRanges = [];
         this.isSelecting = false;
         this.isResizing = false;
         this.resizeHandle = null;
@@ -714,6 +841,116 @@ export class TimelineFrames {
         }
         if (this.frameStrip) {
             this.frameStrip.removeAttribute('data-cursor');
+            // Clear any deleted overlays
+            const old = this.frameStrip.querySelectorAll('.timeline-deleted-overlay');
+            old.forEach(el => el.parentElement && el.parentElement.removeChild(el));
+        }
+        if (this.deletedMarkersLayer) {
+            this.deletedMarkersLayer.innerHTML = '';
+        }
+    }
+
+    // --- Deleted ranges management and collapsed mapping ---
+    addDeletedRange(range) {
+        this.deletedRanges.push({ start: range.start, end: range.end });
+        this.normalizeDeletedRanges();
+    }
+
+    normalizeDeletedRanges() {
+        if (!this.deletedRanges.length) return;
+        const ranges = [...this.deletedRanges]
+            .filter(r => r.end > r.start)
+            .sort((a, b) => a.start - b.start);
+        const merged = [];
+        for (const r of ranges) {
+            if (!merged.length) { merged.push({ ...r }); continue; }
+            const last = merged[merged.length - 1];
+            if (r.start <= last.end + 1e-6) {
+                last.end = Math.max(last.end, r.end);
+            } else {
+                merged.push({ ...r });
+            }
+        }
+        this.deletedRanges = merged;
+    }
+
+    getKeptRanges() {
+        this.normalizeDeletedRanges();
+        const kept = [];
+        let cursor = 0;
+        for (const r of this.deletedRanges) {
+            if (r.start > cursor) kept.push({ start: cursor, end: r.start });
+            cursor = Math.max(cursor, r.end);
+        }
+        if (this.duration > cursor) kept.push({ start: cursor, end: this.duration });
+        return kept;
+    }
+
+    getCollapsedDuration() {
+        const kept = this.getKeptRanges();
+        return kept.reduce((acc, seg) => acc + (seg.end - seg.start), 0);
+    }
+
+    getCollapsedPercentForTime(time) {
+        const total = this.getCollapsedDuration();
+        if (!total || total <= 0) return 0;
+        const kept = this.getKeptRanges();
+        let collapsedTime = 0;
+        for (const seg of kept) {
+            if (time >= seg.end) {
+                collapsedTime += (seg.end - seg.start);
+            } else if (time > seg.start) {
+                collapsedTime += (time - seg.start);
+                break;
+            } else {
+                break;
+            }
+        }
+        return clamp((collapsedTime / total) * 100, 0, 100);
+    }
+
+    getTimeForCollapsedPercent(percent) {
+        const total = this.getCollapsedDuration();
+        if (!total || total <= 0) return 0;
+        const collapsedTime = clamp(percent, 0, 100) / 100 * total;
+        return this.getTimeForCollapsedTime(collapsedTime);
+    }
+
+    getTimeForCollapsedTime(collapsedTime) {
+        const total = this.getCollapsedDuration();
+        const t = Math.max(0, Math.min(total, collapsedTime));
+        const kept = this.getKeptRanges();
+        let acc = 0;
+        for (const seg of kept) {
+            const segDur = seg.end - seg.start;
+            if (t <= acc + segDur) {
+                const offset = t - acc;
+                return seg.start + Math.max(0, offset);
+            }
+            acc += segDur;
+        }
+        return this.duration || 0;
+    }
+
+    renderDeletedMarkers() {
+        if (!this.deletedMarkersLayer) return;
+        this.deletedMarkersLayer.innerHTML = '';
+        if (!this.duration || this.duration <= 0) return;
+        for (const r of this.deletedRanges) {
+            const pct = (r.start / this.duration) * 100;
+            const marker = document.createElement('div');
+            marker.className = 'timeline-deleted-marker';
+            marker.style.left = `calc(${pct}% - 6px)`; // center the triangle
+            marker.title = `Expand deleted ${formatTime(r.end - r.start)}`;
+            marker.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const changed = this.restoreDeletedInRange(r.start, r.end);
+                if (changed) {
+                    this.renderDeletedMarkers();
+                    this.updateDeletedOverlays();
+                }
+            });
+            this.deletedMarkersLayer.appendChild(marker);
         }
     }
 

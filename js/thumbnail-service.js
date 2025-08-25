@@ -77,6 +77,26 @@ export class ThumbnailService {
         this.processQueue(onProgress);
     }
 
+    generateThumbnailsAtTimes(times, onProgress) {
+        if (!this.offscreenVideo || !Array.isArray(times) || times.length === 0) return;
+        this.thumbnailCache.clear();
+        this.seekQueue = [];
+
+        const thumbnailWidth = 120;
+        const videoAspectRatio = this.offscreenVideo.videoWidth / this.offscreenVideo.videoHeight;
+        const thumbnailHeight = Math.round(thumbnailWidth / videoAspectRatio);
+
+        this.offscreenCanvas.width = thumbnailWidth;
+        this.offscreenCanvas.height = thumbnailHeight;
+
+        times.forEach((time, index) => {
+            const t = Math.max(0, Math.min(time, (this.offscreenVideo.duration || time) - 0.1));
+            this.seekQueue.push({ time: t, index, width: thumbnailWidth, height: thumbnailHeight });
+        });
+
+        this.processQueue(onProgress);
+    }
+
     async processQueue(onProgress) {
         if (this.isProcessing || this.seekQueue.length === 0) return;
         

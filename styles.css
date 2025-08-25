@@ -257,6 +257,56 @@ body {
     min-width: 1px;
 }
 
+/* Collapsed timeline track (shows only non-deleted time) */
+.timeline-collapsed-track {
+    height: 8px;
+    background: #2a2a2a;
+    position: relative;
+    width: 100%;
+    margin: 6px 0 2px 0;
+    border-radius: 3px;
+    border: 1px solid #4a4a4a;
+}
+
+.timeline-collapsed-line {
+    height: 100%;
+    background: #4a9eff;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0%;
+    border-radius: 3px;
+    min-width: 1px;
+}
+
+.timeline-collapsed-playhead {
+    position: absolute;
+    top: -4px;
+    width: 2px;
+    bottom: -4px;
+    background: #ffffff;
+    box-shadow: 0 0 4px rgba(74, 158, 255, 0.8);
+}
+
+.timeline-deleted-markers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none; /* re-enable on child */
+}
+
+.timeline-deleted-marker {
+    position: absolute;
+    top: -6px;
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 8px solid #dc3545; /* red */
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
+    cursor: pointer;
+    pointer-events: auto;
+}
+
 .timeline-playhead-frames {
     position: absolute;
     top: 0;
@@ -289,6 +339,24 @@ body {
     border-radius: 1px;
     pointer-events: none;
     z-index: 5;
+}
+
+/* Deleted segments overlay (visual indication only) */
+.timeline-deleted-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(220, 53, 69, 0.22),
+        rgba(220, 53, 69, 0.22) 8px,
+        rgba(220, 53, 69, 0.35) 8px,
+        rgba(220, 53, 69, 0.35) 16px
+    );
+    border-top: 1px solid rgba(220, 53, 69, 0.5);
+    border-bottom: 1px solid rgba(220, 53, 69, 0.5);
+    pointer-events: none;
+    z-index: 4; /* below selection overlay, above thumbnails */
 }
 
 .timeline-selection-overlay::before,
@@ -565,6 +633,11 @@ body {
     border-color: #4a9eff;
 }
 .icon-button svg { display: block; }
+.icon-button[disabled] {
+    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
+}
 
 /* Export Modal */
 .export-modal {
