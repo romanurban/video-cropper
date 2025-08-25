@@ -65,13 +65,8 @@ export class ThumbnailService {
         this.offscreenCanvas.height = thumbnailHeight;
         
         for (let i = 0; i < count; i++) {
-            const time = Math.min(i * interval, duration - 0.1);
-            this.seekQueue.push({
-                time,
-                index: i,
-                width: thumbnailWidth,
-                height: thumbnailHeight
-            });
+            const time = Math.min(i * interval, Math.max(0, duration - 0.05));
+            this.seekQueue.push({ time, index: i, width: thumbnailWidth, height: thumbnailHeight });
         }
         
         this.processQueue(onProgress);
@@ -89,9 +84,20 @@ export class ThumbnailService {
         this.offscreenCanvas.width = thumbnailWidth;
         this.offscreenCanvas.height = thumbnailHeight;
 
-        times.forEach((time, index) => {
-            const t = Math.max(0, Math.min(time, (this.offscreenVideo.duration || time) - 0.1));
-            this.seekQueue.push({ time: t, index, width: thumbnailWidth, height: thumbnailHeight });
+        // Sort and de-dup times to minimize backward seeks and identical timestamps
+        const maxDur = Number.isFinite(this.offscreenVideo.duration) ? this.offscreenVideo.duration : Math.max(...times);
+        const sorted = [...times]
+            .map((t, i) => ({ t: Math.max(0, Math.min(t, Math.max(0, maxDur - 0.05))), i }))
+            .sort((a, b) => a.t - b.t);
+        let lastT = -Infinity;
+        const unique = [];
+        for (const { t, i } of sorted) {
+            const tt = (t <= lastT) ? (lastT + 0.001) : t;
+            unique.push({ t: tt, i });
+            lastT = tt;
+        }
+        unique.forEach(({ t, i }) => {
+            this.seekQueue.push({ time: t, index: i, width: thumbnailWidth, height: thumbnailHeight });
         });
 
         this.processQueue(onProgress);
@@ -101,12 +107,19 @@ export class ThumbnailService {
         if (this.isProcessing || this.seekQueue.length === 0) return;
         
         this.isProcessing = true;
+        // Ensure video is ready to decode
+        try {
+            await this.ensureReady();
+        } catch { /* ignore */ }
         
+        // Process in ascending time order
+        this.seekQueue.sort((a, b) => a.time - b.time);
+
         while (this.seekQueue.length > 0 && !this.abortController?.signal.aborted) {
             const item = this.seekQueue.shift();
             
             try {
-                const thumbnail = await this.captureThumbnail(item.time, item.width, item.height);
+                const thumbnail = await this.captureThumbnail(item.time, item.width, item.height, 3);
                 if (thumbnail && !this.abortController?.signal.aborted) {
                     this.thumbnailCache.set(item.time, {
                         url: thumbnail,
@@ -127,6 +140,23 @@ export class ThumbnailService {
         }
         
         this.isProcessing = false;
+    }
+
+    async ensureReady() {
+        if (!this.offscreenVideo) return;
+        const v = this.offscreenVideo;
+        if (v.readyState >= 2) return;
+        await new Promise((resolve) => {
+            const done = () => { cleanup(); resolve(); };
+            const cleanup = () => {
+                v.removeEventListener('loadeddata', done);
+                v.removeEventListener('canplay', done);
+                v.removeEventListener('canplaythrough', done);
+            };
+            v.addEventListener('loadeddata', done, { once: true });
+            v.addEventListener('canplay', done, { once: true });
+            v.addEventListener('canplaythrough', done, { once: true });
+        });
     }
 
     async captureThumbnail(time, width, height) {
