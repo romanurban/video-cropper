@@ -103,6 +103,41 @@ export function formatTimecode(seconds, options = {}) {
     return timecode;
 }
 
+export function parseTimecode(input) {
+    if (input == null) return null;
+    const s = String(input).trim();
+    if (s === '') return null;
+    // Accept formats:
+    // - SS
+    // - SS.mmm
+    // - MM:SS
+    // - MM:SS.mmm
+    // - HH:MM:SS
+    // - HH:MM:SS.mmm
+    const parts = s.split(':');
+    let hours = 0, minutes = 0, secs = 0;
+    const parseSecs = (str) => {
+        const n = Number(str);
+        return isNaN(n) ? NaN : n;
+    };
+    if (parts.length === 1) {
+        secs = parseSecs(parts[0]);
+    } else if (parts.length === 2) {
+        minutes = Number(parts[0]);
+        secs = parseSecs(parts[1]);
+    } else if (parts.length === 3) {
+        hours = Number(parts[0]);
+        minutes = Number(parts[1]);
+        secs = parseSecs(parts[2]);
+    } else {
+        return null;
+    }
+    if (!isFinite(hours) || !isFinite(minutes) || !isFinite(secs)) return null;
+    if (minutes < 0 || secs < 0 || hours < 0) return null;
+    const total = (hours * 3600) + (minutes * 60) + secs;
+    return isFinite(total) ? total : null;
+}
+
 export function getVideoBaseName(filename) {
     if (!filename) return 'video';
     const name = filename.split('.').slice(0, -1).join('.');

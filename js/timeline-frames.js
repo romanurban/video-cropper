@@ -569,11 +569,11 @@ export class TimelineFrames {
                 // Handle selection resize
                 let newStartSec = this.selectionStartSec;
                 let newEndSec = this.selectionEndSec;
-                if (this.resizeHandle === 'start') {
-                    newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.1);
-                } else if (this.resizeHandle === 'end') {
-                    newEndSec = clamp(currentTime, this.selectionStartSec + 0.1, this.duration);
-                }
+            if (this.resizeHandle === 'start') {
+                newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.01);
+            } else if (this.resizeHandle === 'end') {
+                newEndSec = clamp(currentTime, this.selectionStartSec + 0.01, this.duration);
+            }
                 this.updateSelectionPreview(newStartSec, newEndSec);
             } else {
                 // Live resize expanded deleted
@@ -645,9 +645,9 @@ export class TimelineFrames {
                 let newStartSec = this.selectionStartSec;
                 let newEndSec = this.selectionEndSec;
                 if (this.resizeHandle === 'start') {
-                    newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.1);
+                    newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.01);
                 } else if (this.resizeHandle === 'end') {
-                    newEndSec = clamp(currentTime, this.selectionStartSec + 0.1, this.duration);
+                    newEndSec = clamp(currentTime, this.selectionStartSec + 0.01, this.duration);
                 }
                 appState.setSelection(newStartSec, newEndSec);
                 // Seek to the beginning of the resized selection
@@ -694,7 +694,7 @@ export class TimelineFrames {
             const endSec = Math.max(this.selectionAnchor, endTime);
             
             // Only create selection if there's meaningful duration (minimum 0.1 seconds)
-            const minSelectionDuration = 0.1;
+            const minSelectionDuration = 0.01;
             if (Math.abs(endSec - startSec) >= minSelectionDuration) {
                 // Clamp selection to video bounds
                 const clampedStartSec = clamp(startSec, 0, this.duration);

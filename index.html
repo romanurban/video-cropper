@@ -113,8 +113,12 @@
                 </div>
                 <div class="selection-info" id="selection-info" style="display: none;">
                     <span class="selection-label">Selection:</span>
-                    <span class="selection-time">In: <span id="selection-start">--:--</span></span>
-                    <span class="selection-time">Out: <span id="selection-end">--:--</span></span>
+                    <span class="selection-time">In:
+                        <input id="selection-start-input" class="time-input" type="text" inputmode="numeric" placeholder="00:00:00.000" aria-label="Selection start time" />
+                    </span>
+                    <span class="selection-time">Out:
+                        <input id="selection-end-input" class="time-input" type="text" inputmode="numeric" placeholder="00:00:00.000" aria-label="Selection end time" />
+                    </span>
                     <span class="selection-time">Duration: <span id="selection-duration">--:--</span></span>
                     <button id="restore-selection-button" class="icon-button" title="Restore deleted fragments in selection" aria-label="Restore deleted">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

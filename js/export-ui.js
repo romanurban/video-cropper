@@ -1,6 +1,6 @@
 import { appState } from './state.js';
 import { exportManager } from './export-manager.js';
-import { formatTime } from './utils.js';
+import { formatTime, formatTimecode } from './utils.js';
 
 export class ExportUI {
     constructor() {
@@ -247,16 +247,15 @@ export class ExportUI {
         if (!rangeDisplay || !durationDisplay) return;
         
         if (state.selectionStartSec !== null && state.selectionEndSec !== null) {
-            const startTime = formatTime(state.selectionStartSec);
-            const endTime = formatTime(state.selectionEndSec);
+            const startTime = formatTimecode(state.selectionStartSec, { withMillis: true });
+            const endTime = formatTimecode(state.selectionEndSec, { withMillis: true });
             const duration = state.selectionEndSec - state.selectionStartSec;
-            
             rangeDisplay.textContent = `Selection: ${startTime} - ${endTime}`;
-            durationDisplay.textContent = `Duration: ${formatTime(duration)}`;
+            durationDisplay.textContent = `Duration: ${formatTimecode(duration, { withMillis: true })}`;
         } else {
             rangeDisplay.textContent = 'Full video';
             if (state.videoMetadata) {
-                durationDisplay.textContent = `Duration: ${formatTime(state.videoMetadata.duration)}`;
+                durationDisplay.textContent = `Duration: ${formatTimecode(state.videoMetadata.duration, { withMillis: true })}`;
             }
         }
     }

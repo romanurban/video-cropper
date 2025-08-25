@@ -3,7 +3,7 @@ import { VideoPlayer } from './video-player.js';
 import { FrameRenderer } from './frame-renderer.js';
 import { TimelineFrames } from './timeline-frames.js';
 import { exportUI } from './export-ui.js';
-import { isVideoFile, formatTime } from './utils.js';
+import { isVideoFile, formatTime, formatTimecode, parseTimecode } from './utils.js';
 import { CropOverlay } from './crop-overlay.js';
 
 class App {
@@ -53,8 +53,8 @@ class App {
             durationDisplay: document.getElementById('duration'),
             resolutionDisplay: document.getElementById('resolution'),
             selectionInfo: document.getElementById('selection-info'),
-            selectionStart: document.getElementById('selection-start'),
-            selectionEnd: document.getElementById('selection-end'),
+            selectionStartInput: document.getElementById('selection-start-input'),
+            selectionEndInput: document.getElementById('selection-end-input'),
             selectionDuration: document.getElementById('selection-duration'),
             restoreSelectionButton: document.getElementById('restore-selection-button'),
             deleteSelectionButton: document.getElementById('delete-selection-button'),
@@ -192,6 +192,37 @@ class App {
             });
         }
 
+        // Precise selection time editing
+        const applyStart = () => {
+            const el = this.elements.selectionStartInput; if (!el) return;
+            const parsed = parseTimecode(el.value);
+            const curEnd = appState.getState('selectionEndSec');
+            if (parsed == null || curEnd == null) return this.refreshSelectionInputs();
+            const minDur = 0.01;
+            const newStart = Math.max(0, Math.min(parsed, curEnd - minDur));
+            appState.setSelection(newStart, curEnd);
+        };
+        const applyEnd = () => {
+            const el = this.elements.selectionEndInput; if (!el) return;
+            const parsed = parseTimecode(el.value);
+            const curStart = appState.getState('selectionStartSec');
+            if (parsed == null || curStart == null) return this.refreshSelectionInputs();
+            const minDur = 0.01;
+            const dur = this.videoPlayer.getDuration() || Infinity;
+            const newEnd = Math.min(dur, Math.max(parsed, curStart + minDur));
+            appState.setSelection(curStart, newEnd);
+        };
+        const bindTimeInput = (el, apply) => {
+            if (!el) return;
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); apply(); el.blur(); }
+                if (e.key === 'Escape') { e.preventDefault(); this.refreshSelectionInputs(); el.blur(); }
+            });
+            el.addEventListener('blur', () => apply());
+        };
+        bindTimeInput(this.elements.selectionStartInput, applyStart);
+        bindTimeInput(this.elements.selectionEndInput, applyEnd);
+
         if (this.elements.exportGlobalButton) {
             this.elements.exportGlobalButton.addEventListener('click', () => {
                 // Open the unified export modal; export-manager will honor deleted ranges
@@ -226,12 +257,25 @@ class App {
 
     setupKeyboardControls() {
         document.addEventListener('keydown', (e) => {
+            const t = e.target;
+            const tag = (t && t.tagName) ? t.tagName.toLowerCase() : '';
+            const isEditable = !!(t && (tag === 'input' || tag === 'textarea' || t.isContentEditable || (t.closest && t.closest('[contenteditable="true"]'))));
+
             if (e.key === 'Escape') {
                 appState.clearSelection();
-            } else if (e.key === ' ' && e.shiftKey) {
+                return;
+            }
+
+            // Do not trigger global shortcuts while typing in inputs/editable fields
+            if (isEditable) return;
+
+            if (e.key === ' ' && e.shiftKey) {
                 e.preventDefault();
                 this.playFromSelectionStart();
-            } else if ((e.key === 'Delete' || e.key === 'Backspace') && this.hasActiveSelection()) {
+                return;
+            }
+
+            if ((e.key === 'Delete' || e.key === 'Backspace') && this.hasActiveSelection()) {
                 e.preventDefault();
                 appState.deleteSelection();
             }
@@ -269,7 +313,9 @@ class App {
 
         appState.subscribe('videoMetadata', (metadata) => {
             if (metadata) {
-                this.elements.durationDisplay.textContent = formatTime(metadata.duration);
+                import('./utils.js').then(({ formatTimecode }) => {
+                    this.elements.durationDisplay.textContent = formatTimecode(metadata.duration, { withMillis: true });
+                });
                 this.elements.resolutionDisplay.textContent = `${metadata.width}×${metadata.height}`;
             }
         });
@@ -306,9 +352,8 @@ class App {
 
         appState.subscribe('selection', (selection) => {
             if (selection) {
-                this.elements.selectionStart.textContent = formatTime(selection.startSec);
-                this.elements.selectionEnd.textContent = formatTime(selection.endSec);
-                this.elements.selectionDuration.textContent = formatTime(selection.endSec - selection.startSec);
+                this.refreshSelectionInputs(selection);
+                this.elements.selectionDuration.textContent = formatTimecode(selection.endSec - selection.startSec, { withMillis: true });
                 this.elements.selectionInfo.style.display = 'flex';
                 this.updateRestoreButtonState();
             } else {
@@ -494,6 +539,13 @@ class App {
         }, 3000);
     }
 
+    refreshSelectionInputs(selection) {
+        const startSec = selection?.startSec ?? appState.getState('selectionStartSec');
+        const endSec = selection?.endSec ?? appState.getState('selectionEndSec');
+        if (startSec == null || endSec == null) return;
+        if (this.elements.selectionStartInput) this.elements.selectionStartInput.value = formatTimecode(startSec, { withMillis: true });
+        if (this.elements.selectionEndInput) this.elements.selectionEndInput.value = formatTimecode(endSec, { withMillis: true });
+    }
     updateRestoreButtonState() {
         const btn = this.elements.restoreSelectionButton;
         if (!btn) return;
