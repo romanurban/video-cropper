@@ -358,6 +358,7 @@ class App {
 
         appState.subscribe('selection', (selection) => {
             if (selection) {
+                // Only update inputs if not focused to avoid disrupting typing
                 this.refreshSelectionInputs(selection);
                 this.elements.selectionDuration.textContent = formatTimecode(selection.endSec - selection.startSec, { withMillis: true });
                 this.elements.selectionInfo.style.display = 'flex';
@@ -365,6 +366,28 @@ class App {
             } else {
                 this.elements.selectionInfo.style.display = 'none';
                 this.updateRestoreButtonState();
+            }
+        });
+
+        // Live preview of selection while dragging/resizing
+        appState.subscribe('selectionPreview', (preview) => {
+            const startInput = this.elements.selectionStartInput;
+            const endInput = this.elements.selectionEndInput;
+            const startFocused = (document.activeElement === startInput);
+            const endFocused = (document.activeElement === endInput);
+            if (preview && typeof preview.startSec === 'number' && typeof preview.endSec === 'number') {
+                if (startInput && !startFocused) startInput.value = formatTimecode(preview.startSec, { withMillis: true });
+                if (endInput && !endFocused) endInput.value = formatTimecode(preview.endSec, { withMillis: true });
+                this.elements.selectionDuration.textContent = formatTimecode(preview.endSec - preview.startSec, { withMillis: true });
+            } else {
+                // Restore to current selection values
+                const selStart = appState.getState('selectionStartSec');
+                const selEnd = appState.getState('selectionEndSec');
+                if (selStart != null && selEnd != null) {
+                    if (startInput && !startFocused) startInput.value = formatTimecode(selStart, { withMillis: true });
+                    if (endInput && !endFocused) endInput.value = formatTimecode(selEnd, { withMillis: true });
+                    this.elements.selectionDuration.textContent = formatTimecode(selEnd - selStart, { withMillis: true });
+                }
             }
         });
 

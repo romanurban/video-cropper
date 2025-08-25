@@ -564,12 +564,14 @@ export class TimelineFrames {
                 // Handle selection resize
                 let newStartSec = this.selectionStartSec;
                 let newEndSec = this.selectionEndSec;
-            if (this.resizeHandle === 'start') {
-                newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.01);
-            } else if (this.resizeHandle === 'end') {
-                newEndSec = clamp(currentTime, this.selectionStartSec + 0.01, this.duration);
-            }
+                if (this.resizeHandle === 'start') {
+                    newStartSec = clamp(currentTime, 0, this.selectionEndSec - 0.01);
+                } else if (this.resizeHandle === 'end') {
+                    newEndSec = clamp(currentTime, this.selectionStartSec + 0.01, this.duration);
+                }
                 this.updateSelectionPreview(newStartSec, newEndSec);
+                // Emit live preview for UI
+                appState.emit('selectionPreview', { startSec: newStartSec, endSec: newEndSec });
             } else {
                 // Live resize expanded deleted
                 const idx = this.resizeDeletedIndex;
@@ -599,6 +601,8 @@ export class TimelineFrames {
                 const endSec = Math.max(this.selectionAnchor, currentTime);
                 
                 this.updateSelectionPreview(startSec, endSec);
+                // Emit live preview for UI
+                appState.emit('selectionPreview', { startSec, endSec });
                 
                 // Update playhead position to follow the drag for immediate visual feedback
                 this.currentTime = currentTime;
@@ -647,6 +651,8 @@ export class TimelineFrames {
                 appState.setSelection(newStartSec, newEndSec);
                 // Seek to the beginning of the resized selection
                 this.handleSeek(newStartSec);
+                // Clear preview after finalize
+                appState.emit('selectionPreview', null);
             } else {
                 // Finalize expanded deleted resize
                 const idx = this.resizeDeletedIndex;
@@ -698,6 +704,8 @@ export class TimelineFrames {
                 
                 // Seek to the beginning of the selection
                 this.handleSeek(clampedStartSec);
+                // Clear preview after finalize
+                appState.emit('selectionPreview', null);
             }
         }
         
@@ -894,9 +902,20 @@ export class TimelineFrames {
 
     updateLayout() {
         const containerRect = this.container.getBoundingClientRect();
-        if (containerRect.width !== this.containerWidth) {
-            this.containerWidth = containerRect.width;
-            // Could trigger thumbnail regeneration here if needed
+        const newWidth = Math.round(containerRect.width);
+        if (newWidth !== this.containerWidth) {
+            const prev = this.containerWidth || 0;
+            this.containerWidth = newWidth;
+            // Regenerate thumbnails on width change to keep fit crisp
+            // Debounce already applied via handleResize
+            if (this.duration && this.duration > 0) {
+                this.generateThumbnails();
+                // Re-apply overlays/markers and selection visuals
+                this.updateDeletedOverlays();
+                this.renderDeletedMarkers();
+                this.updateSelectionDisplay();
+                this.updatePlayheadVisual();
+            }
         }
     }
 

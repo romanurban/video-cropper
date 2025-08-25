@@ -613,6 +613,22 @@ body {
 
 @media (max-width: 600px), (pointer: coarse) {
     .selection-info .time-input { width: 106px; padding: 6px 8px; font-size: 0.9rem; }
+    :root { --controls-mobile-h: 112px; }
+    body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .main-content { overflow-y: auto; padding-bottom: calc(var(--controls-mobile-h) + env(safe-area-inset-bottom, 0px)); }
+    .video-container { max-height: 50dvh; }
+    .controls-panel {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 1000;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: auto;
+        backdrop-filter: blur(6px);
+        padding: 0.75rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+        gap: 0.6rem;
+        flex-wrap: wrap;
+    }
 }
 
 
