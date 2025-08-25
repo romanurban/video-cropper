@@ -419,7 +419,12 @@ export class TimelineFrames {
     handlePointerDown(event) {
         if (event.button !== 0) return; // Only handle left click
         // Ignore clicks on deleted markers (they handle their own expansion)
-        if (event.target && (event.target.classList?.contains('timeline-deleted-marker') || event.target.closest?.('.timeline-deleted-marker'))) {
+        if (event.target && (
+            event.target.classList?.contains('timeline-deleted-marker') ||
+            event.target.closest?.('.timeline-deleted-marker') ||
+            event.target.classList?.contains('timeline-collapse-marker') ||
+            event.target.closest?.('.timeline-collapse-marker')
+        )) {
             return;
         }
         if (!this.duration || this.duration <= 0) return; // Disable if no metadata
@@ -975,6 +980,19 @@ export class TimelineFrames {
         this.generateThumbnails();
     }
 
+    collapseDeletedRange(start, end) {
+        this.deletedRanges = this.deletedRanges.map(r => {
+            if (Math.abs(r.start - start) < 1e-6 && Math.abs(r.end - end) < 1e-6) {
+                return { ...r, expanded: false };
+            }
+            return r;
+        });
+        this.normalizeDeletedRanges();
+        this.renderDeletedMarkers();
+        this.updateDeletedOverlays();
+        this.generateThumbnails();
+    }
+
     renderDeletedMarkers() {
         if (!this.deletedMarkersLayer) return;
         this.deletedMarkersLayer.innerHTML = '';
@@ -990,6 +1008,21 @@ export class TimelineFrames {
                 e.stopPropagation();
                 // Expand (show) this deleted region in the ribbon (still deleted)
                 this.expandDeletedRange(r.start, r.end);
+            });
+            this.deletedMarkersLayer.appendChild(marker);
+        }
+
+        // Collapse markers for expanded deleted ranges (left edge)
+        for (const r of this.deletedRanges.filter(r => r.expanded)) {
+            const pct = this.getCollapsedPercentForTime(r.start);
+            const marker = document.createElement('div');
+            marker.className = 'timeline-collapse-marker';
+            marker.style.left = `${pct}%`;
+            marker.title = `Collapse deleted ${formatTime(r.end - r.start)}`;
+            marker.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.collapseDeletedRange(r.start, r.end);
             });
             this.deletedMarkersLayer.appendChild(marker);
         }

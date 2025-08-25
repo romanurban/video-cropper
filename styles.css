@@ -316,6 +316,26 @@ body {
     border-top-color: #ff5a52;
 }
 
+/* Collapse marker (for expanded deleted region) */
+.timeline-collapse-marker {
+    position: absolute;
+    top: 4px; /* vertically center-ish within ribbon */
+    left: 0;
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-left: 10px solid #ff3b30; /* triangle pointing right */
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+    cursor: pointer;
+    pointer-events: auto;
+    /* align tip exactly at left edge (no centering) */
+}
+
+.timeline-collapse-marker:hover {
+    border-left-color: #ff5a52;
+}
+
 .timeline-playhead-frames {
     position: absolute;
     top: 0;
