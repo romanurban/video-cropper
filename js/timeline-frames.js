@@ -86,6 +86,11 @@ export class TimelineFrames {
             this.updateDeletedOverlays();
             this.renderDeletedMarkers();
             this.generateThumbnails();
+            // Sync to global state for export
+            if (appState && typeof appState.setDeletedRanges === 'function') {
+                const ranges = (this.deletedRanges || []).map(r => ({ startSec: r.start, endSec: r.end }));
+                appState.setDeletedRanges(ranges);
+            }
         }
         return changed;
     }
@@ -940,6 +945,10 @@ export class TimelineFrames {
     addDeletedRange(range) {
         this.deletedRanges.push({ start: range.start, end: range.end, expanded: Boolean(range.expanded) });
         this.normalizeDeletedRanges();
+        if (appState && typeof appState.setDeletedRanges === 'function') {
+            const ranges = (this.deletedRanges || []).map(r => ({ startSec: r.start, endSec: r.end }));
+            appState.setDeletedRanges(ranges);
+        }
     }
 
     normalizeDeletedRanges() {
@@ -963,6 +972,10 @@ export class TimelineFrames {
             }
         }
         this.deletedRanges = merged;
+        if (appState && typeof appState.setDeletedRanges === 'function') {
+            const ranges = (this.deletedRanges || []).map(r => ({ startSec: r.start, endSec: r.end }));
+            appState.setDeletedRanges(ranges);
+        }
     }
 
     getKeptRanges() {
@@ -1054,6 +1067,10 @@ export class TimelineFrames {
         this.renderDeletedMarkers();
         this.updateDeletedOverlays();
         this.generateThumbnails();
+        if (appState && typeof appState.setDeletedRanges === 'function') {
+            const ranges = (this.deletedRanges || []).map(r => ({ startSec: r.start, endSec: r.end }));
+            appState.setDeletedRanges(ranges);
+        }
     }
 
     collapseDeletedRange(start, end) {
@@ -1067,6 +1084,10 @@ export class TimelineFrames {
         this.renderDeletedMarkers();
         this.updateDeletedOverlays();
         this.generateThumbnails();
+        if (appState && typeof appState.setDeletedRanges === 'function') {
+            const ranges = (this.deletedRanges || []).map(r => ({ startSec: r.start, endSec: r.end }));
+            appState.setDeletedRanges(ranges);
+        }
     }
 
     renderDeletedMarkers() {

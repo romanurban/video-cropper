@@ -144,6 +144,11 @@ export class ExportManager {
             };
         }
 
+        // Add deleted ranges (logical deletions) if present
+        if (Array.isArray(state.deletedRanges) && state.deletedRanges.length > 0) {
+            operations.deletedRanges = state.deletedRanges.map(r => ({ startSec: r.startSec, endSec: r.endSec }));
+        }
+
         // Add crop operation if cropRect exists
         if (state.cropRect && state.videoMetadata) {
             // Defer mapping to worker/ffmpeg; pass normalized rect and source dims

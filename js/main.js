@@ -46,6 +46,7 @@ class App {
             forwardButton: document.getElementById('forward-button'),
             seekEndButton: document.getElementById('seek-end-button'),
             loopButton: document.getElementById('loop-button'),
+            exportGlobalButton: document.getElementById('export-global-button'),
             volumeSlider: document.getElementById('volume-slider'),
             volumePercent: document.getElementById('volume-percentage'),
             filenameDisplay: document.getElementById('filename'),
@@ -191,6 +192,15 @@ class App {
             });
         }
 
+        if (this.elements.exportGlobalButton) {
+            this.elements.exportGlobalButton.addEventListener('click', () => {
+                // Open the unified export modal; export-manager will honor deleted ranges
+                if (this.videoPlayer) {
+                    exportUI.showExportModal();
+                }
+            });
+        }
+
         if (this.elements.deleteSelectionButton) {
             this.elements.deleteSelectionButton.addEventListener('click', () => {
                 if (this.hasActiveSelection()) {
@@ -321,6 +331,10 @@ class App {
             if (this.elements.exportButton) {
                 this.elements.exportButton.disabled = !file;
                 this.elements.exportButton.title = file ? 'Export video' : 'Load a video to export';
+            }
+            if (this.elements.exportGlobalButton) {
+                this.elements.exportGlobalButton.disabled = !file;
+                this.elements.exportGlobalButton.title = file ? 'Export video' : 'Load a video to export';
             }
         });
 

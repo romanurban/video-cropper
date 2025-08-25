@@ -79,11 +79,18 @@ async function processWithFFmpeg({ id, file, operations, preset, durationSec }) 
   const args = ['-hide_banner', '-loglevel', 'info', '-nostdin', '-y'];
   const hasCut = operations.cut && typeof operations.cut.startSec === 'number' && typeof operations.cut.endSec === 'number';
   const hasCrop = !!(operations.crop && operations.crop.mapped);
+  const deleted = Array.isArray(operations.deletedRanges) ? operations.deletedRanges : [];
   // Set target duration for progress reporting
   if (hasCut) {
     currentTargetDurationSec = Math.max(0, Number(operations.cut.endSec) - Number(operations.cut.startSec));
   } else if (typeof durationSec === 'number' && isFinite(durationSec)) {
     currentTargetDurationSec = durationSec;
+  } else if (!hasCut && !hasCrop) {
+    // No edits: export as-is via stream copy
+    args.push('-i', inputName);
+    args.push('-c', 'copy', '-map', '0:v:0', '-map', '0:a?');
+    args.push('-movflags', '+faststart');
+    args.push(outputName);
   } else {
     currentTargetDurationSec = 0;
   }
@@ -92,7 +99,27 @@ async function processWithFFmpeg({ id, file, operations, preset, durationSec }) 
   const videoCrf = String(preset?.video?.crf ?? 21);
   const audioBR = String(preset?.audio?.bitrate ?? '192k');
 
-  if (hasCut && !hasCrop && videoPreset === 'copy') {
+  if (deleted.length > 0) {
+    // Build skip filter (select/aselect) that removes deleted time ranges; re-encode
+    args.push('-i', inputName);
+    const kept = computeKeptFromDeleted(deleted, durationSec);
+    currentTargetDurationSec = kept.reduce((acc, seg) => acc + Math.max(0, (seg.e - seg.s)), 0);
+    if (!kept.length) throw new Error('No content to export after deletions');
+    const fc = buildSkipFilter(deleted);
+    args.push('-filter_complex', fc);
+    args.push('-map', '[vout]');
+    args.push('-map', '[aout]?');
+    args.push(
+      '-c:v', 'libx264',
+      '-preset', videoPreset,
+      '-crf', videoCrf,
+      '-threads', '0',
+      '-vsync', '2',
+      '-movflags', '+faststart'
+    );
+    args.push('-c:a', 'aac', '-b:a', audioBR, '-ac', '2');
+    args.push(outputName);
+  } else if (hasCut && !hasCrop && videoPreset === 'copy') {
     // Fast path: stream copy without re-encoding if explicitly requested
     const start = Number(operations.cut.startSec);
     const dur = Math.max(0, Number(operations.cut.endSec) - start);
@@ -128,13 +155,118 @@ async function processWithFFmpeg({ id, file, operations, preset, durationSec }) 
   }
 
   self.postMessage({ type: 'status', id, message: 'Encoding with FFmpeg...' });
-  await ffmpeg.exec(args);
+  try {
+    await ffmpeg.exec(args);
+  } catch (err) {
+    // If failure occurs in deleted-ranges path due to missing audio, retry video-only filter
+    try {
+      if (deleted.length > 0) {
+        const args2 = ['-hide_banner', '-loglevel', 'info', '-nostdin', '-y'];
+        args2.push('-i', inputName);
+        const kept = computeKeptFromDeleted(deleted, durationSec);
+        currentTargetDurationSec = kept.reduce((acc, seg) => acc + Math.max(0, (seg.e - seg.s)), 0);
+        const fc2 = buildSkipFilterVideoOnly(deleted);
+        args2.push('-filter_complex', fc2);
+        args2.push('-map', '[vout]');
+        args2.push(
+          '-c:v', 'libx264',
+          '-preset', videoPreset,
+          '-crf', videoCrf,
+          '-threads', '0',
+          '-vsync', '2',
+          '-movflags', '+faststart',
+          '-an'
+        );
+        args2.push(outputName);
+        self.postMessage({ type: 'status', id, message: 'Retrying without audio track...' });
+        await ffmpeg.exec(args2);
+      } else {
+        throw err;
+      }
+    } catch (err2) {
+      throw err2 || err;
+    }
+  }
 
   const data = await ffmpeg.readFile(outputName);
   const blob = new Blob([data], { type: 'video/mp4' });
   self.postMessage({ type: 'complete', id, blob, size: blob.size });
   // Ensure final progress reaches 100%
   self.postMessage({ type: 'progress', id, progress: 100, message: 'Done' });
+}
+
+function computeKeptFromDeleted(deletedRanges, fullDuration) {
+  const d = (typeof fullDuration === 'number' && isFinite(fullDuration)) ? fullDuration : 0;
+  const sorted = deletedRanges
+    .map(r => ({ s: Math.max(0, Number(r.startSec)), e: Math.max(0, Number(r.endSec)) }))
+    .filter(r => isFinite(r.s) && isFinite(r.e) && r.e > r.s)
+    .sort((a, b) => a.s - b.s);
+  const merged = [];
+  for (const r of sorted) {
+    if (!merged.length) { merged.push({ ...r }); continue; }
+    const last = merged[merged.length - 1];
+    if (r.s <= last.e + 1e-6) last.e = Math.max(last.e, r.e); else merged.push({ ...r });
+  }
+  const kept = [];
+  let cursor = 0;
+  for (const r of merged) {
+    if (r.s > cursor) kept.push({ s: cursor, e: r.s });
+    cursor = Math.max(cursor, r.e);
+  }
+  if (d && d > cursor) kept.push({ s: cursor, e: d });
+  return kept;
+}
+
+function buildConcatFilter(segments) {
+  // segments: [{s, e}] times in seconds
+  const vlabels = [];
+  const alabels = [];
+  let parts = [];
+  for (let i = 0; i < segments.length; i++) {
+    const { s, e } = segments[i];
+    parts.push(`[0:v]trim=start=${s}:end=${e},setpts=PTS-STARTPTS[v${i}]`);
+    parts.push(`[0:a]atrim=start=${s}:end=${e},asetpts=PTS-STARTPTS[a${i}]`);
+    vlabels.push(`[v${i}]`);
+    alabels.push(`[a${i}]`);
+  }
+  const concat = `${vlabels.join('')}${alabels.join('')}concat=n=${segments.length}:v=1:a=1[vout][aout]`;
+  parts.push(concat);
+  return parts.join(';');
+}
+
+function buildSkipFilter(deletedRanges) {
+  // Build select/aselect expressions that exclude deleted windows
+  const ds = deletedRanges
+    .map(r => ({ s: Math.max(0, Number(r.startSec)), e: Math.max(0, Number(r.endSec)) }))
+    .filter(r => isFinite(r.s) && isFinite(r.e) && r.e > r.s);
+  const conds = ds.map(r => `between(t,${r.s},${r.e})`);
+  const expr = conds.length ? `not(${conds.join('+')})` : '1';
+  const v = `[0:v]select='${expr}',setpts=N/FRAME_RATE/TB[vout]`;
+  const a = `[0:a]aselect='${expr}',asetpts=N/SR/TB[aout]`;
+  return `${v};${a}`;
+}
+
+function buildConcatFilterVideoOnly(segments) {
+  const vlabels = [];
+  let parts = [];
+  for (let i = 0; i < segments.length; i++) {
+    const { s, e } = segments[i];
+    parts.push(`[0:v]trim=start=${s}:end=${e},setpts=PTS-STARTPTS[v${i}]`);
+    vlabels.push(`[v${i}]`);
+  }
+  const concat = `${vlabels.join('')}concat=n=${segments.length}:v=1:a=0[vout]`;
+  parts.push(concat);
+  return parts.join(';');
+}
+
+function buildSkipFilterVideoOnly(deletedRanges) {
+  const ds = deletedRanges
+    .map(r => ({ s: Math.max(0, Number(r.startSec)), e: Math.max(0, Number(r.endSec)) }))
+    .filter(r => isFinite(r.s) && isFinite(r.e) && r.e > r.s);
+  const conds = ds.map(r => `between(t,${r.s},${r.e})`);
+  const expr = conds.length ? `not(${conds.join('+')})` : '1';
+  const v = `[0:v]select='${expr}',setpts=N/FRAME_RATE/TB[vout]`;
+  return v;
 }
 
 function mapNormalizedCropToSource(operations) {

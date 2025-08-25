@@ -16,7 +16,8 @@ class AppState {
             selectionEndSec: null,
             isLooping: false,
             // Normalized crop rect relative to displayed video content (0..1)
-            cropRect: null
+            cropRect: null,
+            deletedRanges: [] // [{startSec, endSec}] in media time
         };
     }
 
@@ -187,6 +188,32 @@ class AppState {
 
     clearCropRect() {
         this.setCropRect(null);
+    }
+
+    // Deleted ranges management (logical deletions for export)
+    setDeletedRanges(ranges) {
+        // Expect array of {startSec, endSec}
+        if (!Array.isArray(ranges)) {
+            this.setState({ deletedRanges: [] });
+            return;
+        }
+        // Normalize: sort and merge overlaps
+        const sorted = ranges
+            .map(r => ({ startSec: Math.max(0, Number(r.startSec)), endSec: Math.max(0, Number(r.endSec)) }))
+            .filter(r => isFinite(r.startSec) && isFinite(r.endSec) && r.endSec > r.startSec)
+            .sort((a, b) => a.startSec - b.startSec);
+        const merged = [];
+        for (const r of sorted) {
+            if (!merged.length) { merged.push({ ...r }); continue; }
+            const last = merged[merged.length - 1];
+            if (r.startSec <= last.endSec + 1e-6) {
+                last.endSec = Math.max(last.endSec, r.endSec);
+            } else {
+                merged.push({ ...r });
+            }
+        }
+        this.setState({ deletedRanges: merged });
+        this.emit('deletedRanges', merged);
     }
 
     reset() {
