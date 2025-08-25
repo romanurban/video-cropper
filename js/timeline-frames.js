@@ -83,6 +83,8 @@ export class TimelineFrames {
         if (changed) {
             this.deletedRanges = next;
             this.updateDeletedOverlays();
+            this.renderDeletedMarkers();
+            this.generateThumbnails();
         }
         return changed;
     }
@@ -223,7 +225,7 @@ export class TimelineFrames {
             this.updateSelectionDisplay();
         });
 
-        // When a selection is deleted, mark that range visually on the ribbon
+        // When a selection is deleted, collapse it in the ribbon and add marker
         appState.subscribe('selectionDeleted', (data) => {
             if (data && data.deletedSelection && this.duration > 0) {
                 const { startSec, endSec } = data.deletedSelection;
@@ -231,9 +233,11 @@ export class TimelineFrames {
                 const start = Math.max(0, Math.min(this.duration, startSec));
                 const end = Math.max(0, Math.min(this.duration, endSec));
                 if (end > start) {
-                    this.addDeletedRange({ start, end });
+                    this.addDeletedRange({ start, end, expanded: false });
                     this.updateDeletedOverlays();
                     this.renderDeletedMarkers();
+                    // Regenerate thumbnails to reflect collapsed ribbon
+                    this.generateThumbnails();
                 }
             }
         });
@@ -249,43 +253,42 @@ export class TimelineFrames {
 
     generateThumbnails() {
         if (!this.duration || this.duration <= 0) return;
-        
         this.updateLayout();
-        
+
         const containerWidth = this.container.getBoundingClientRect().width;
-        const thumbnailWidth = 100; // Reduced width to fit more thumbnails
-        const thumbnailSpacing = 1; // Reduced spacing
-        const maxThumbnails = 300; // Increased maximum
-        
-        // Calculate how many thumbnails can fit in the container width
-        const availableWidth = containerWidth - 32; // Account for padding
+        const thumbnailWidth = 100;
+        const thumbnailSpacing = 1;
+        const maxThumbnails = 300;
+
+        const availableWidth = containerWidth - 32;
         const thumbnailsPerWidth = Math.floor(availableWidth / (thumbnailWidth + thumbnailSpacing));
-        
-        // Calculate count based on duration or fit to width
-        const targetInterval = 2; // seconds per thumbnail (increased granularity)
-        let countByDuration = Math.floor(this.duration / targetInterval);
-        
-        // Prioritize fitting more thumbnails, use container width as primary constraint
+
+        const collapsedDuration = this.getCollapsedDuration() || this.duration;
+        const targetInterval = 2;
+        let countByDuration = Math.floor(collapsedDuration / targetInterval);
         let count = Math.min(thumbnailsPerWidth, maxThumbnails);
-        
-        // If we have fewer thumbnails than duration would suggest, use duration-based count
-        if (countByDuration < count && countByDuration > 10) {
-            count = countByDuration;
-        }
-        
-        count = Math.max(count, 10); // Minimum 10 thumbnails for better granularity
-        
+        if (countByDuration < count && countByDuration > 10) count = countByDuration;
+        count = Math.max(count, 10);
+
         this.clearThumbnails();
-        this.createPlaceholders(count, availableWidth);
-        
-        this.thumbnailService.generateThumbnails(
-            this.duration,
-            count,
-            this.onThumbnailGenerated.bind(this)
-        );
+        this.createPlaceholders(count, availableWidth, collapsedDuration);
+
+        const times = [];
+        for (let i = 0; i < count; i++) {
+            const collapsedTime = (i / Math.max(1, count - 1)) * collapsedDuration;
+            const t = this.getTimeForCollapsedTime(collapsedTime);
+            times.push(t);
+        }
+
+        if (typeof this.thumbnailService.generateThumbnailsAtTimes === 'function') {
+            this.thumbnailService.generateThumbnailsAtTimes(times, this.onThumbnailGenerated.bind(this));
+        } else {
+            // Fallback: approximate by duration mapping
+            this.thumbnailService.generateThumbnails(this.duration, count, this.onThumbnailGenerated.bind(this));
+        }
     }
 
-    createPlaceholders(count, availableWidth) {
+    createPlaceholders(count, availableWidth, collapsedDuration) {
         const videoMetadata = appState.getState('videoMetadata');
         const aspectRatio = videoMetadata ? videoMetadata.width / videoMetadata.height : 16/9;
         
@@ -314,12 +317,13 @@ export class TimelineFrames {
             placeholder.style.height = `${thumbnailHeight}px`;
             placeholder.dataset.index = i;
             
-            const time = (i / count) * this.duration;
-            placeholder.dataset.time = time;
+            const collapsedTime = (i / Math.max(1, count - 1)) * collapsedDuration;
+            const realTime = this.getTimeForCollapsedTime(collapsedTime);
+            placeholder.dataset.time = realTime;
             
             const timeLabel = document.createElement('div');
             timeLabel.className = 'thumbnail-time';
-            timeLabel.textContent = formatTime(time);
+            timeLabel.textContent = formatTime(realTime);
             placeholder.appendChild(timeLabel);
             
             this.thumbnailsContainer.appendChild(placeholder);
@@ -369,8 +373,8 @@ export class TimelineFrames {
         // Ensure we have valid dimensions
         if (rectWidth <= 0) return null;
         
-        const startPercentage = this.selectionStartSec / this.duration;
-        const endPercentage = this.selectionEndSec / this.duration;
+        const startPercentage = this.getCollapsedPercentForTime(this.selectionStartSec) / 100;
+        const endPercentage = this.getCollapsedPercentForTime(this.selectionEndSec) / 100;
         
         const startX = Math.round(startPercentage * rectWidth);
         const endX = Math.round(endPercentage * rectWidth);
@@ -399,7 +403,7 @@ export class TimelineFrames {
             this.frameStrip.setAttribute('data-cursor', 'col-resize');
         } else if (this.selectionStartSec !== null && this.selectionEndSec !== null) {
         const percentage = clamp(x / rect.width, 0, 1);
-        const time = percentage * this.duration;
+        const time = this.getTimeForCollapsedPercent(percentage * 100);
             
             // Check if inside selection for move cursor
             if (time >= this.selectionStartSec && time <= this.selectionEndSec) {
@@ -414,6 +418,10 @@ export class TimelineFrames {
 
     handlePointerDown(event) {
         if (event.button !== 0) return; // Only handle left click
+        // Ignore clicks on deleted markers (they handle their own expansion)
+        if (event.target && (event.target.classList?.contains('timeline-deleted-marker') || event.target.closest?.('.timeline-deleted-marker'))) {
+            return;
+        }
         if (!this.duration || this.duration <= 0) return; // Disable if no metadata
         
         // Debounce rapid clicks
@@ -443,7 +451,7 @@ export class TimelineFrames {
         }
         
         const percentage = clamp(x / rectWidth, 0, 1);
-        const clickTime = Math.round((percentage * this.duration) * 1000) / 1000;
+        const clickTime = Math.round((this.getTimeForCollapsedPercent(percentage * 100)) * 1000) / 1000;
         
         // Debug logging for troubleshooting (uncomment if needed)
         // console.debug('Timeline click:', { x, rectWidth, percentage, clickTime, duration: this.duration });
@@ -508,7 +516,7 @@ export class TimelineFrames {
         if (rectWidth <= 0) return;
         
         const percentage = clamp(x / rectWidth, 0, 1);
-        const currentTime = Math.round((percentage * this.duration) * 1000) / 1000;
+        const currentTime = Math.round((this.getTimeForCollapsedPercent(percentage * 100)) * 1000) / 1000;
         
         if (this.isResizing) {
             // Handle selection resize
@@ -734,28 +742,25 @@ export class TimelineFrames {
     updatePlayheadVisual() {
         if (!this.duration || this.duration <= 0) return;
         
-        const percentage = (this.currentTime / this.duration) * 100;
-        const clampedPercentage = clamp(percentage, 0, 100);
-        
+        const clampedPercentage = clamp(this.getCollapsedPercentForTime(this.currentTime), 0, 100);
         this.playhead.style.left = `${clampedPercentage}%`;
         
         if (this.progressLine) {
             // If there's a selection, limit progress line to selection end
             let progressPercentage = clampedPercentage;
             if (this.selectionStartSec !== null && this.selectionEndSec !== null) {
-                const selectionEndPercentage = (this.selectionEndSec / this.duration) * 100;
+                const selectionEndPercentage = this.getCollapsedPercentForTime(this.selectionEndSec);
                 progressPercentage = Math.min(clampedPercentage, selectionEndPercentage);
             }
             this.progressLine.style.width = `${progressPercentage}%`;
         }
-        // No collapsed line when using single ribbon
     }
 
     updateSelectionPreview(startSec, endSec) {
         if (!this.duration || this.duration <= 0) return;
         
-        const startPercentage = (startSec / this.duration) * 100;
-        const endPercentage = (endSec / this.duration) * 100;
+        const startPercentage = this.getCollapsedPercentForTime(startSec);
+        const endPercentage = this.getCollapsedPercentForTime(endSec);
         const width = endPercentage - startPercentage;
         
         this.selectionOverlay.style.display = 'block';
@@ -774,8 +779,8 @@ export class TimelineFrames {
             return;
         }
         
-        const startPercentage = (this.selectionStartSec / this.duration) * 100;
-        const endPercentage = (this.selectionEndSec / this.duration) * 100;
+        const startPercentage = this.getCollapsedPercentForTime(this.selectionStartSec);
+        const endPercentage = this.getCollapsedPercentForTime(this.selectionEndSec);
         const width = endPercentage - startPercentage;
         
         this.selectionOverlay.style.display = 'block';
@@ -793,10 +798,10 @@ export class TimelineFrames {
         const old = this.frameStrip.querySelectorAll('.timeline-deleted-overlay');
         old.forEach(el => el.parentElement && el.parentElement.removeChild(el));
         if (!this.duration || this.duration <= 0) return;
-        // Render overlays for each deleted range on full timeline scale
-        for (const range of this.deletedRanges) {
-            const startPct = (range.start / this.duration) * 100;
-            const endPct = (range.end / this.duration) * 100;
+        // Render overlays only for expanded deleted ranges using collapsed mapping
+        for (const range of this.deletedRanges.filter(r => r.expanded)) {
+            const startPct = this.getCollapsedPercentForTime(range.start);
+            const endPct = this.getCollapsedPercentForTime(range.end);
             const widthPct = Math.max(0, endPct - startPct);
             if (widthPct <= 0) continue;
             const overlay = document.createElement('div');
@@ -852,7 +857,7 @@ export class TimelineFrames {
 
     // --- Deleted ranges management and collapsed mapping ---
     addDeletedRange(range) {
-        this.deletedRanges.push({ start: range.start, end: range.end });
+        this.deletedRanges.push({ start: range.start, end: range.end, expanded: Boolean(range.expanded) });
         this.normalizeDeletedRanges();
     }
 
@@ -867,6 +872,7 @@ export class TimelineFrames {
             const last = merged[merged.length - 1];
             if (r.start <= last.end + 1e-6) {
                 last.end = Math.max(last.end, r.end);
+                last.expanded = Boolean(last.expanded || r.expanded);
             } else {
                 merged.push({ ...r });
             }
@@ -886,17 +892,37 @@ export class TimelineFrames {
         return kept;
     }
 
-    getCollapsedDuration() {
+    getVisibleRanges() {
+        // Visible = kept ranges + deleted ranges that are expanded
         const kept = this.getKeptRanges();
-        return kept.reduce((acc, seg) => acc + (seg.end - seg.start), 0);
+        const expandedDeleted = this.deletedRanges.filter(r => r.expanded).map(r => ({ start: r.start, end: r.end, deleted: true }));
+        const all = [...kept.map(k => ({ ...k, deleted: false })), ...expandedDeleted]
+            .sort((a, b) => a.start - b.start);
+        // Merge neighbors that are same type and adjacent
+        const merged = [];
+        for (const seg of all) {
+            if (!merged.length) { merged.push({ ...seg }); continue; }
+            const last = merged[merged.length - 1];
+            if (seg.deleted === last.deleted && seg.start <= last.end + 1e-6) {
+                last.end = Math.max(last.end, seg.end);
+            } else {
+                merged.push({ ...seg });
+            }
+        }
+        return merged;
+    }
+
+    getCollapsedDuration() {
+        const vis = this.getVisibleRanges();
+        return vis.reduce((acc, seg) => acc + (seg.end - seg.start), 0);
     }
 
     getCollapsedPercentForTime(time) {
         const total = this.getCollapsedDuration();
         if (!total || total <= 0) return 0;
-        const kept = this.getKeptRanges();
+        const vis = this.getVisibleRanges();
         let collapsedTime = 0;
-        for (const seg of kept) {
+        for (const seg of vis) {
             if (time >= seg.end) {
                 collapsedTime += (seg.end - seg.start);
             } else if (time > seg.start) {
@@ -919,9 +945,9 @@ export class TimelineFrames {
     getTimeForCollapsedTime(collapsedTime) {
         const total = this.getCollapsedDuration();
         const t = Math.max(0, Math.min(total, collapsedTime));
-        const kept = this.getKeptRanges();
+        const vis = this.getVisibleRanges();
         let acc = 0;
-        for (const seg of kept) {
+        for (const seg of vis) {
             const segDur = seg.end - seg.start;
             if (t <= acc + segDur) {
                 const offset = t - acc;
@@ -932,23 +958,34 @@ export class TimelineFrames {
         return this.duration || 0;
     }
 
+    expandDeletedRange(start, end) {
+        this.deletedRanges = this.deletedRanges.map(r => {
+            if (Math.abs(r.start - start) < 1e-6 && Math.abs(r.end - end) < 1e-6) {
+                return { ...r, expanded: true };
+            }
+            return r;
+        });
+        this.normalizeDeletedRanges();
+        this.renderDeletedMarkers();
+        this.updateDeletedOverlays();
+        this.generateThumbnails();
+    }
+
     renderDeletedMarkers() {
         if (!this.deletedMarkersLayer) return;
         this.deletedMarkersLayer.innerHTML = '';
         if (!this.duration || this.duration <= 0) return;
-        for (const r of this.deletedRanges) {
-            const pct = (r.start / this.duration) * 100;
+        for (const r of this.deletedRanges.filter(r => !r.expanded)) {
+            const pct = this.getCollapsedPercentForTime(r.start);
             const marker = document.createElement('div');
             marker.className = 'timeline-deleted-marker';
-            marker.style.left = `calc(${pct}% - 6px)`; // center the triangle
+            marker.style.left = `${pct}%`;
             marker.title = `Expand deleted ${formatTime(r.end - r.start)}`;
-            marker.addEventListener('click', (e) => {
+            marker.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                const changed = this.restoreDeletedInRange(r.start, r.end);
-                if (changed) {
-                    this.renderDeletedMarkers();
-                    this.updateDeletedOverlays();
-                }
+                // Expand (show) this deleted region in the ribbon (still deleted)
+                this.expandDeletedRange(r.start, r.end);
             });
             this.deletedMarkersLayer.appendChild(marker);
         }
