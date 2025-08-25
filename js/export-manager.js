@@ -237,6 +237,7 @@ export class ExportManager {
             preset
         });
     }
+
     
     async exportWithWebCodecs(file, operations, preset) {
         if (!this.webcodecsWorker) {

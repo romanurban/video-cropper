@@ -3,6 +3,8 @@ import { VideoPlayer } from './video-player.js';
 import { FrameRenderer } from './frame-renderer.js';
 import { TimelineFrames } from './timeline-frames.js';
 import { exportUI } from './export-ui.js';
+import { exportManager } from './export-manager.js';
+import { importManager } from './import-manager.js';
 import { isVideoFile, formatTime, formatTimecode, parseTimecode } from './utils.js';
 import { CropOverlay } from './crop-overlay.js';
 
@@ -454,12 +456,38 @@ class App {
     }
 
     async handleFileSelect(file) {
-        if (!isVideoFile(file)) {
-            this.showError('Please select a valid video file.');
-            return;
-        }
-
         try {
+            const name = file.name || '';
+            const type = file.type || '';
+            const isAVI = type === 'video/avi' || /\.avi$/i.test(name);
+
+            if (isAVI) {
+                // Transcode using FFmpeg.wasm, then load the resulting MP4
+                exportUI.showProgressModal();
+                exportUI.updateStatus('Importing AVI (fast remux if possible)...');
+                await importManager.transcodeToMP4(file, {
+                    preset: { video: { preset: 'veryfast', crf: 23 }, audio: { bitrate: '160k' } },
+                    onProgress: (p) => exportUI.updateProgress(p || {}),
+                    onStatus: (msg) => exportUI.updateStatus(msg || 'Processing...'),
+                    onComplete: async (blob) => {
+                        exportUI.hideProgressModal();
+                        const mp4File = new File([blob], (name.replace(/\.avi$/i,'') || 'video') + '.mp4', { type: 'video/mp4' });
+                        await this.videoPlayer.loadFile(mp4File);
+                    },
+                    onError: (err) => {
+                        exportUI.hideProgressModal();
+                        console.error('Transcode failed:', err);
+                        this.showError('Failed to transcode AVI. Please try another file.');
+                    }
+                });
+                return;
+            }
+
+            if (!isVideoFile(file)) {
+                this.showError('Please select a valid video file.');
+                return;
+            }
+
             await this.videoPlayer.loadFile(file);
         } catch (error) {
             console.error('Error handling file:', error);
