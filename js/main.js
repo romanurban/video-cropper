@@ -223,6 +223,12 @@ class App {
         bindTimeInput(this.elements.selectionStartInput, applyStart);
         bindTimeInput(this.elements.selectionEndInput, applyEnd);
 
+        if (document.getElementById('clear-selection-button')) {
+            document.getElementById('clear-selection-button').addEventListener('click', () => {
+                appState.clearSelection();
+            });
+        }
+
         if (this.elements.exportGlobalButton) {
             this.elements.exportGlobalButton.addEventListener('click', () => {
                 // Open the unified export modal; export-manager will honor deleted ranges

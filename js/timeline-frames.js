@@ -527,12 +527,7 @@ export class TimelineFrames {
             return;
         }
         
-        // Check if clicking outside existing selection to clear it
-        if (this.selectionStartSec !== null && this.selectionEndSec !== null &&
-            (clickTime < this.selectionStartSec || clickTime > this.selectionEndSec)) {
-            // Clear selection if clicking outside
-            appState.clearSelection();
-        }
+        // Do not clear selection when clicking outside it; allow seeking while keeping selection
         
         // Start new selection or seek
         this.isDragging = true;
